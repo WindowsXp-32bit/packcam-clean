@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>打包发货视频记录 V24 真条码扫描版</title>
+<title>打包发货视频记录 V25 多引擎并行识别版</title>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://unpkg.com/@zxing/browser@latest/umd/index.min.js"></script>
 <style>
@@ -39,7 +39,7 @@ body{height:var(--app-height,100dvh)}
 .status{max-width:76%;padding:8px 10px;border-radius:14px;background:rgba(2,6,23,.58);backdrop-filter:blur(8px);border:1px solid var(--line);font-size:13px;line-height:1.35}
 .status b{color:#fff}.status .muted{color:var(--muted)}
 .pill{padding:8px 10px;border-radius:999px;background:rgba(2,6,23,.65);border:1px solid var(--line);font-size:12px;white-space:nowrap}
-.controls{position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;pointer-events:auto}
+.controls{position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;display:flex;gap:8px;align-items:center;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;overscroll-behavior-x:contain;pointer-events:auto}
 button{border:0;border-radius:999px;padding:11px 14px;color:#fff;font-size:14px;font-weight:800;background:rgba(30,41,59,.86);backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,.25)}
 button.primary{background:linear-gradient(135deg,#0ea5e9,#2563eb)}button.ok{background:linear-gradient(135deg,#16a34a,#22c55e)}button.warn{background:rgba(161,98,7,.92)}button.bad{background:rgba(185,28,28,.92)}button.small{font-size:12px;padding:9px 11px}button:disabled{opacity:.42}
 .side{height:var(--app-height,100dvh);overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#0b1220;border-left:1px solid var(--line);padding:14px}
@@ -55,7 +55,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
   .videoStage{height:var(--app-height,100dvh);min-height:0;overflow:hidden}
   .side{position:fixed;right:8px;top:calc(64px + env(safe-area-inset-top));bottom:calc(86px + env(safe-area-inset-bottom));width:min(92vw,360px);height:auto;z-index:6;border:1px solid var(--line);border-radius:18px;background:rgba(11,18,32,.94);backdrop-filter:blur(12px);transform:translateX(calc(100% + 20px));transition:.22s;max-height:calc(var(--app-height,100dvh) - 150px)}
   .side.open{transform:translateX(0)}
-  .controls{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding:4px 0;max-width:calc(100vw - 16px);scrollbar-width:none}
+  .controls{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));justify-content:flex-start;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;padding:4px 0;max-width:calc(100vw - 16px);scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x}
   .controls::-webkit-scrollbar{display:none}
   .controls button{flex:0 0 auto;padding:10px 12px;font-size:12px}
   .status{font-size:12px;max-width:72%;padding:7px 9px}.pill{font-size:11px;padding:7px 8px}
@@ -98,7 +98,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
     </div>
   </section>
   <aside class="side" id="side">
-    <h1>V24 真条码扫描版</h1>
+    <h1>V25 多引擎并行识别版</h1>
     <div class="sub">真条码扫描框 + 实体扫码枪 + 本地OCR + AI视觉兜底。下方实时显示条码/OCR/AI候选，方便判断是否扫到信息。</div>
     <div class="card">
       <div class="kv"><div class="k">工作状态</div><div class="v" id="workState">未开始</div></div>
@@ -122,7 +122,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
       </div>
       <label>员工/打包台备注</label>
       <input id="operator" placeholder="例如：1号打包台"/>
-      <div class="hint">V24真条码扫描：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
+      <div class="hint">V25多引擎并行识别：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
     </div>
     <div class="card">
       <label>手动/扫码枪单号</label>
@@ -338,7 +338,7 @@ function refreshScannerButton(){
 }
 function updateScanEffect(){
   const el=$('scanEffect');
-  if(el) el.classList.toggle('active', !!(work.active && work.phoneScanner));
+  if(el) el.classList.toggle('active', !!(work.active && work.phoneScanner && !isRecording));
 }
 function togglePhoneScanner(){
   work.phoneScanner=!work.phoneScanner;
@@ -386,43 +386,50 @@ function regionKey(src){
   if(src.includes('整张')) return 'full';
   return src;
 }
+function engineKey(src){
+  src=String(src||'');
+  if(src.includes('扫码枪')||src.includes('键盘')) return '扫码枪';
+  if(src.includes('条码')) return '条码';
+  if(src.includes('OCR')) return 'OCR';
+  if(src.includes('AI')) return 'AI';
+  return '其他';
+}
 function consensus(items){
   const map={};
   for(const it of items){
     const n=norm(it.num); if(!valid(n)) continue;
-    map[n]??={num:n,srcs:new Set(),regions:new Set(),barcode:false};
-    map[n].srcs.add(it.src||'未知');
-    const rk=regionKey(it.src||'');
-    map[n].regions.add(rk);
-    if(rk==='barcode') map[n].barcode=true;
+    const eng=engineKey(it.src||'');
+    map[n]??={num:n,engines:new Set(),srcs:new Set()};
+    map[n].engines.add(eng);
+    map[n].srcs.add(it.src||eng);
   }
   for(const v of Object.values(map)){
-    // 条码本身可靠，允许单处条码直接通过；OCR/AI必须两处区域一致。
-    if(v.barcode) return {num:v.num,src:[...v.srcs].join(' + ')};
-    const effective=[...v.regions].filter(r=>!['full'].includes(r));
-    const hasTwo = effective.length>=2 || v.regions.has('ai-confirmed');
-    if(hasTwo) return {num:v.num,src:[...v.srcs].join(' + ')};
+    // 实体扫码枪/键盘输入由 handleWaybill 直接触发；这里主要处理手机视觉识别。
+    // 为了防止误录，手机视觉必须至少两个不同识别引擎得到同一13位单号。
+    const engines=[...v.engines].filter(e=>e!=='其他');
+    if(engines.length>=2) return {num:v.num,src:[...v.srcs].join(' + '),engines:engines.join(' + ')};
   }
   return null;
 }
-async function callAI(zones){
+async function callAIasync function callAI(zones){
   const endpoint=$('aiEndpoint').value.trim(); if(!endpoint || $('aiMode').value==='off') return [];
   const now=Date.now(); if(now<work.aiCooldown) return [];
   work.aiCooldown=now+3500;
   const imgs=zones.slice(0,5).map(z=>({name:z.name,dataUrl:preprocess(z.canvas).toDataURL('image/jpeg',.86)}));
   status('AI兜底识别中','只上传面单号小区域，不上传整张面单。'); updateScanInfo({stage:'AI识别',ai:'请求中',reason:'本地未通过，正在请求AI兜底'});
   try{
-    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs,hint:'中国邮政/EMS面单。第一张通常是绿色扫码框区域，后面是顶部条码下方数字、右侧竖向条码旁数字、边缘竖排数字。严格只接受13位纯数字运单号，不限制首位。必须至少两处区域识别到同一13位数字，才算confirmed。不要把手机号、路由码、日期、数量、重量当成单号。'})});
+    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs,hint:'中国邮政/EMS面单。第一张通常是绿色扫码框区域，后面是顶部条码下方数字、右侧竖向条码旁数字、边缘竖排数字。严格只接受13位纯数字运单号，不限制首位。请尽量返回看到的13位纯数字运单号候选；前端会用条码/OCR/AI多引擎交叉验证，两种方式同号才自动录制。不要把手机号、路由码、日期、数量、重量当成单号。'})});
     const j=await r.json(); if(!r.ok) throw new Error(j.error||r.statusText);
     const arr=[];
     if(j.confirmed && valid(j.waybill)) arr.push({num:j.waybill,src:'AI确认:'+((j.regions||[]).join('+')||'两处一致')});
     if(Array.isArray(j.evidence)){
       j.evidence.forEach(ev=>{ const n=norm(ev.waybill||ev.num||ev.text); if(valid(n)) arr.push({num:n,src:'AI:'+String(ev.region||'未知区域')}); });
     }
-    // candidates只用于日志，不作为自动开录条件，避免AI单次猜错。
-    const logNums=[...new Set(arr.map(x=>x.num).concat((j.candidates||[]).map(norm).filter(valid)))];
-    if(arr.length){ updateScanInfo({stage:'AI识别',ai:arr.map(x=>x.num).join('/'),reason:'AI两处一致，通过校验'}); log('AI通过校验：'+arr.map(x=>x.src+'='+x.num).join(' / '),'ok'); }
-    else if(logNums.length){ updateScanInfo({stage:'AI识别',ai:logNums.join('/'),reason:'AI有候选但未满足两处一致'}); log('AI有候选但未满足两处一致：'+logNums.join('/'),'warn'); }
+    // V25：AI候选也作为“AI引擎”参与多引擎交叉验证，但不能单独触发。
+    const candNums=[...new Set((j.candidates||[]).map(norm).filter(valid))];
+    candNums.forEach(n=>arr.push({num:n,src:'AI:候选'}));
+    const logNums=[...new Set(arr.map(x=>x.num))];
+    if(arr.length){ updateScanInfo({stage:'AI识别',ai:logNums.join('/'),reason:'AI有候选，等待条码/OCR同号确认'}); log('AI候选：'+arr.map(x=>x.src+'='+x.num).join(' / '),'ok'); }
     else { updateScanInfo({stage:'AI识别',ai:'-',reason:'AI未识别到有效单号'}); log('AI未识别到有效单号','warn'); }
     return arr;
   }catch(e){log('AI识别失败：'+e.message,'bad');return []}
@@ -431,33 +438,50 @@ async function scanLoop(force=false){
   if(!work.active || work.busy || !work.stream) return; work.busy=true;
   try{
     const src=capture(1280); if(!src) return;
-    updateScanInfo({stage:'条码扫描',reason:'正在裁剪绿色扫码框并解码'});
+    updateScanInfo({stage:'多引擎识别',reason:'条码/OCR/AI并行候选，需两种方式同号'});
     const scanZone={name:'扫码框区域',canvas:crop(src,scanBoxRegion(src))};
     const box=findLabel(src); const label=crop(src,box); const zones=[scanZone,...makeZones(label)];
-    let items=[];
-    // 第一优先级：专门扫码框，只扫条码，速度最快、误识别最低。
-    const ps=await phoneScannerScan(src,zones); items=items.concat(ps);
-    let hit=consensus(items);
-    if(!hit){ const b=await localBarcode(zones); items=items.concat(b); hit=consensus(items); }
-    // OCR/AI比较慢，不要每帧都跑；手机扫码枪扫不到时再兜底。
     work.loopCount=(work.loopCount||0)+1;
-    if(!hit && (force || work.loopCount%2===0)){ const o=await localOCR(zones); items=items.concat(o); hit=consensus(items); }
-    if(!hit && (force || ++work.localFail>=2)){ const a=await callAI(zones); items=items.concat(a); hit=consensus(items); }
+    let items=[];
+
+    // 1) 条码引擎：扫码框、顶部、侧边多区域尝试
+    const ps=await phoneScannerScan(src,zones); items=items.concat(ps);
+    const b=await localBarcode(zones); items=items.concat(b);
+
+    // 2) OCR引擎：每轮都跑关键区域，和条码/AI交叉验证
+    const o=await localOCR(zones); items=items.concat(o);
+
+    // 3) AI引擎：有冷却，避免每帧都请求；本地已有候选或强制补扫时更积极
+    const hasLocalCandidate = items.some(x=>valid(x.num));
+    if(force || hasLocalCandidate || work.loopCount%2===0){
+      const a=await callAI(zones); items=items.concat(a);
+    }
+
+    const hit=consensus(items);
     if(hit){
-      work.localFail=0; $('detectedNo').textContent=hit.num; $('sourceText').textContent=hit.src; status('校验通过',hit.num+'｜'+hit.src); updateScanInfo({stage:'校验成功',confirm:'通过',reason:'满足条件，开始/切换录制'}); pulse();
+      work.localFail=0;
+      $('detectedNo').textContent=hit.num;
+      $('sourceText').textContent=hit.src;
+      status('多引擎确认通过', hit.num+'｜'+(hit.engines||hit.src));
+      updateScanInfo({stage:'校验成功',confirm:'通过',reason:'两种识别方式同号：'+(hit.engines||hit.src)});
+      pulse();
       if(hit.num!==recordingNo && work.lastSuccessSpoken!==hit.num){speak('success');work.lastSuccessSpoken=hit.num}
       await handleWaybill(hit.num);
     }else{
-      const srcs=[...new Set(items.map(x=>x.src+':'+x.num))]; $('detectedNo').textContent=srcs.join(' / ')||'-'; $('sourceText').textContent=srcs.length?'未一致':'未识别';
-      status('专门扫码中','把顶部条码/单号或右侧条码/单号放进绿色框，保持1秒。'); updateScanInfo({confirm:'未通过',reason:srcs.length?'有候选但未满足触发条件':'未扫到条码/OCR/AI候选'});
+      const srcs=[...new Set(items.filter(x=>valid(x.num)).map(x=>x.src+':'+x.num))];
+      $('detectedNo').textContent=srcs.join(' / ')||'-';
+      $('sourceText').textContent=srcs.length?'等待第二种识别方式确认':'-';
+      work.localFail++;
+      status('继续扫描','需要两种识别方式识别到同一13位单号');
+      updateScanInfo({confirm:'未通过',reason:srcs.length?'已有候选，等待另一种方式同号确认':'未扫到有效13位单号'});
       if(work.localFail>=4){speak('fail'); work.localFail=0}
     }
   }catch(e){log('扫描出错：'+e.message,'bad')}
   finally{work.busy=false}
 }
-async function handleWaybill(no){no=norm(no); if(!valid(no))return; if(!isRecording){startRecording(no);return} if(no===recordingNo)return; await finishRecording('检测到新面单，自动保存上一单'); startRecording(no)}
-function startRecording(no){if(!work.stream)return;updateScanInfo({stage:'开始录制',confirm:'通过',reason:'正在录制单号 '+no});chunks=[];recStart=Date.now();recordingNo=no;const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm;codecs=vp8')?'video/webm;codecs=vp8':'video/webm';mediaRecorder=new MediaRecorder(work.stream,{mimeType:mime,videoBitsPerSecond:2500000});mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};mediaRecorder.onstart=()=>{isRecording=true;$('currentNo').textContent=no;$('btnFinish').disabled=false;$('recPill').textContent='录制中 '+no;status('开始录制',no);log('开始录制：'+no,'ok');speak('start')};mediaRecorder.start(1000)}
-async function finishRecording(reason='手动完成'){if(!isRecording||!mediaRecorder)return;return new Promise(res=>{const no=recordingNo,st=recStart,ed=Date.now();mediaRecorder.onstop=async()=>{const blob=new Blob(chunks,{type:mediaRecorder.mimeType||'video/webm'});isRecording=false;recordingNo=null;$('currentNo').textContent='-';$('btnFinish').disabled=true;$('recPill').textContent='未录制';if(blob.size)await saveRecord(no,blob,st,ed,reason);chunks=[];res()};try{mediaRecorder.stop()}catch(e){res()}})}
+async function handleWaybillasync function handleWaybill(no){no=norm(no); if(!valid(no))return; if(!isRecording){startRecording(no);return} if(no===recordingNo)return; await finishRecording('检测到新面单，自动保存上一单'); startRecording(no)}
+function startRecording(no){if(!work.stream)return;updateScanInfo({stage:'开始录制',confirm:'通过',reason:'正在录制单号 '+no});chunks=[];recStart=Date.now();recordingNo=no;const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm;codecs=vp8')?'video/webm;codecs=vp8':'video/webm';mediaRecorder=new MediaRecorder(work.stream,{mimeType:mime,videoBitsPerSecond:2500000});mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};mediaRecorder.onstart=()=>{isRecording=true;updateScanEffect();$('currentNo').textContent=no;$('btnFinish').disabled=false;$('recPill').textContent='录制中 '+no;status('开始录制',no);log('开始录制：'+no,'ok');speak('start')};mediaRecorder.start(1000)}
+async function finishRecording(reason='手动完成'){if(!isRecording||!mediaRecorder)return;return new Promise(res=>{const no=recordingNo,st=recStart,ed=Date.now();mediaRecorder.onstop=async()=>{const blob=new Blob(chunks,{type:mediaRecorder.mimeType||'video/webm'});isRecording=false;recordingNo=null;updateScanEffect();$('currentNo').textContent='-';$('btnFinish').disabled=true;$('recPill').textContent='未录制';if(blob.size)await saveRecord(no,blob,st,ed,reason);chunks=[];res()};try{mediaRecorder.stop()}catch(e){res()}})}
 function setupScanner(){
   let buf='',last=0;
   document.addEventListener('keydown',async e=>{
@@ -482,7 +506,7 @@ $('btnManual').onclick=()=>{const n=norm($('manualNo').value);if(!valid(n))retur
 setupScanner();
 refreshScannerButton();
 updateScanEffect();
-log('V24已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
+log('V25已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
 </script>
 </body>
 </html>
