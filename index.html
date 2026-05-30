@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>打包发货视频记录 V19 灵活单号校验版</title>
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+:root{--bg:#07101f;--panel:rgba(12,18,32,.86);--line:rgba(255,255,255,.15);--txt:#f1f5ff;--muted:#a8b5cc;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--blue:#3b82f6}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;height:100%;background:#020617;color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",Roboto,Arial,sans-serif;overflow:hidden}
+.app{height:100dvh;width:100vw;display:grid;grid-template-columns:minmax(0,1fr) 360px;background:var(--bg)}
+.videoStage{position:relative;height:100dvh;background:#000;overflow:hidden}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#flash{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .18s;background:rgba(34,197,94,.22)}
+#flash.on{opacity:1}
+.topbar{position:absolute;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));display:flex;gap:8px;align-items:center;justify-content:space-between;z-index:3;pointer-events:none}
+.status{max-width:76%;padding:8px 10px;border-radius:14px;background:rgba(2,6,23,.58);backdrop-filter:blur(8px);border:1px solid var(--line);font-size:13px;line-height:1.35}
+.status b{color:#fff}.status .muted{color:var(--muted)}
+.pill{padding:8px 10px;border-radius:999px;background:rgba(2,6,23,.65);border:1px solid var(--line);font-size:12px;white-space:nowrap}
+.controls{position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;pointer-events:auto}
+button{border:0;border-radius:999px;padding:11px 14px;color:#fff;font-size:14px;font-weight:800;background:rgba(30,41,59,.86);backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,.25)}
+button.primary{background:linear-gradient(135deg,#0ea5e9,#2563eb)}button.ok{background:linear-gradient(135deg,#16a34a,#22c55e)}button.warn{background:rgba(161,98,7,.92)}button.bad{background:rgba(185,28,28,.92)}button.small{font-size:12px;padding:9px 11px}button:disabled{opacity:.42}
+.side{height:100dvh;overflow:auto;background:#0b1220;border-left:1px solid var(--line);padding:14px}
+h1{font-size:18px;margin:0 0 8px}.sub{font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:12px}
+.card{background:rgba(15,23,42,.78);border:1px solid var(--line);border-radius:18px;padding:12px;margin-bottom:12px}
+.kv{display:grid;grid-template-columns:86px minmax(0,1fr);gap:8px;border-bottom:1px dashed rgba(255,255,255,.12);padding:8px 0;font-size:13px}.kv:last-child{border-bottom:0}.k{color:var(--muted)}.v{font-weight:800;word-break:break-all}
+label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{width:100%;background:#020617;color:#fff;border:1px solid #334155;border-radius:12px;padding:11px;font-size:14px;outline:none}.row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+.log{height:150px;overflow:auto;background:#020617;border:1px solid #1e293b;border-radius:13px;padding:9px;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#cbd5e1}.log div{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.record{background:#020617;border:1px solid #263244;border-radius:14px;padding:10px;margin:10px 0}.record video{width:100%;border-radius:10px;max-height:280px;background:#000}.hint{font-size:12px;line-height:1.55;color:#dbeafe;background:rgba(37,99,235,.13);border:1px solid rgba(96,165,250,.25);border-radius:13px;padding:10px;margin-top:8px}
+.mini{font-size:11px;color:#94a3b8}.hidden{display:none!important}
+@media(max-width:860px){.app{display:block}.videoStage{height:100dvh}.side{position:absolute;right:8px;top:calc(64px + env(safe-area-inset-top));bottom:calc(92px + env(safe-area-inset-bottom));width:min(92vw,360px);height:auto;z-index:6;border:1px solid var(--line);border-radius:18px;background:rgba(11,18,32,.94);backdrop-filter:blur(12px);transform:translateX(calc(100% + 20px));transition:.22s}.side.open{transform:translateX(0)}.controls{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding:4px 0}.controls button{flex:0 0 auto}.status{font-size:12px;max-width:72%}.pill{font-size:11px;padding:7px 8px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="videoStage">
+    <video id="video" autoplay playsinline muted></video>
+    <div id="flash"></div>
+    <div class="topbar">
+      <div class="status" id="statusBox"><b>未开始</b><br><span class="muted">点“开始工作”后才会打开摄像头、识别、语音提示和自动流水。</span></div>
+      <div class="pill" id="recPill">未录制</div>
+    </div>
+    <div class="controls">
+      <button id="btnStart" class="primary">开始工作</button>
+      <button id="btnScan" class="small" disabled>补扫</button>
+      <button id="btnFinish" class="warn small" disabled>完成本单</button>
+      <button id="btnStop" class="bad small" disabled>停止</button>
+      <button id="btnSwitchCam" class="small">前/后</button>
+      <button id="btnVoice" class="small">测试语音</button>
+      <button id="btnPanel" class="small">设置/查询</button>
+    </div>
+  </section>
+  <aside class="side" id="side">
+    <h1>V18 严格校验版</h1>
+    <div class="sub">扫码枪 + 条码 + 本地OCR + AI视觉兜底。严格校验：两处单号一致才自动开始，避免错录。</div>
+    <div class="card">
+      <div class="kv"><div class="k">工作状态</div><div class="v" id="workState">未开始</div></div>
+      <div class="kv"><div class="k">识别单号</div><div class="v" id="detectedNo">-</div></div>
+      <div class="kv"><div class="k">识别来源</div><div class="v" id="sourceText">-</div></div>
+      <div class="kv"><div class="k">当前录制</div><div class="v" id="currentNo">-</div></div>
+      <div class="kv"><div class="k">已保存</div><div class="v" id="savedCount">0</div></div>
+    </div>
+    <div class="card">
+      <label>AI识别接口地址 Cloudflare Worker URL</label>
+      <input id="aiEndpoint" placeholder="例如：https://packcam-ai.xxx.workers.dev/ai-waybill"/>
+      <div class="row">
+        <div>
+          <label>AI兜底</label>
+          <select id="aiMode">
+            <option value="on" selected>开启：本地失败后调用AI</option>
+            <option value="off">关闭：只用条码/OCR/扫码枪</option>
+          </select>
+        </div>
+        <button id="btnSaveCfg" class="small">保存</button>
+      </div>
+      <label>员工/打包台备注</label>
+      <input id="operator" placeholder="例如：1号打包台"/>
+      <div class="hint">没有扫码枪时，V19会先在手机端识别，连续失败后才调用AI。AI和OCR必须满足“13位纯数字单号 + 两处区域一致”才会自动录制；不再限制必须9开头。</div>
+    </div>
+    <div class="card">
+      <label>手动/扫码枪单号</label>
+      <div class="row"><input id="manualNo" placeholder="输入或扫码枪扫入"/><button id="btnManual" class="small">开始/切换</button></div>
+      <div class="mini">蓝牙扫码枪设置成“键盘模式 + 回车后缀”，扫到单号会自动开始/切换。</div>
+    </div>
+    <div class="card">
+      <label>按单号查询视频</label>
+      <div class="row"><input id="searchNo" placeholder="输入快递单号"/><button id="btnSearch" class="small">查询</button></div>
+      <div id="results"></div>
+    </div>
+    <div class="card"><div class="log" id="log"></div></div>
+  </aside>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const video=$('video'), side=$('side');
+const work={active:false, stream:null, track:null, facing:'environment', scanTimer:null, busy:false, aiCooldown:0, localFail:0, lastNo:'', lastNoCount:0, lastSuccessSpoken:''};
+let mediaRecorder=null,chunks=[],recordingNo=null,isRecording=false,recStart=0,savedCount=0,voicesReady=false;
+const frame=document.createElement('canvas'), fctx=frame.getContext('2d',{willReadFrequently:true});
+let barcodeDetector=null;
+
+const audio={
+  start:new Audio('audio/start.mp3'),
+  complete:new Audio('audio/complete.mp3'),
+  success:new Audio('audio/success.mp3'),
+  fail:new Audio('audio/fail.mp3')
+};
+Object.values(audio).forEach(a=>{a.preload='auto';a.volume=1});
+
+function log(s,type=''){const d=document.createElement('div');d.textContent='['+new Date().toLocaleTimeString('zh-CN',{hour12:false})+'] '+s;if(type==='ok')d.style.color='#86efac';if(type==='bad')d.style.color='#fca5a5';if(type==='warn')d.style.color='#fde68a';$('log').prepend(d)}
+function status(a,b=''){ $('statusBox').innerHTML='<b>'+a+'</b><br><span class="muted">'+b+'</span>'; $('workState').textContent=a+(b?' - '+b:''); }
+function pulse(){ $('flash').classList.add('on'); setTimeout(()=>$('flash').classList.remove('on'),220); }
+function norm(s){return String(s||'').replace(/[^\d]/g,'')}
+function valid(n){
+  n=norm(n);
+  // 当前按你这类中国邮政/EMS电子面单优化：13位纯数字，不限制首位。
+  // 排除电话号、路由码、日期、数量等误识别。
+  if(!/^\d{13}$/.test(n)) return false;
+  if(/^(\d)\1+$/.test(n)) return false;
+  if(/202[0-9]/.test(n)) return false;
+  return true;
+}
+function speak(key){ if(!work.active && key!=='test') return; const a= audio[key]||audio.success; try{a.pause();a.currentTime=0;a.play().catch(()=>{}); if(navigator.vibrate) navigator.vibrate(key==='fail'?[120,60,120]:[80]);}catch(e){} }
+function testVoice(){ audio.success.play().catch(()=>{}); setTimeout(()=>audio.start.play().catch(()=>{}),500); setTimeout(()=>audio.complete.play().catch(()=>{}),1050); }
+function saveCfg(){ localStorage.setItem('packcam_ai_endpoint',$('aiEndpoint').value.trim()); localStorage.setItem('packcam_ai_mode',$('aiMode').value); log('设置已保存','ok') }
+function loadCfg(){ $('aiEndpoint').value=localStorage.getItem('packcam_ai_endpoint')||''; $('aiMode').value=localStorage.getItem('packcam_ai_mode')||'on'; }
+loadCfg();
+
+function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open('packcam_ai_v17',1);r.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('records')){const s=db.createObjectStore('records',{keyPath:'id'});s.createIndex('waybill','waybill',{unique:false});s.createIndex('createdAt','createdAt',{unique:false})}};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function saveRecord(no,blob,startAt,endAt,reason){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('records','readwrite');tx.objectStore('records').put({id:Date.now()+'_'+no,waybill:no,blob,startAt,endAt,reason,operator:$('operator').value||'',createdAt:new Date().toISOString(),durationMs:endAt-startAt});tx.oncomplete=()=>{savedCount++;$('savedCount').textContent=savedCount;speak('complete');log('本单录制完成：'+no,'ok');res()};tx.onerror=()=>rej(tx.error)})}
+async function query(no){no=norm(no);const db=await openDB();return new Promise((res,rej)=>{const out=[];const idx=db.transaction('records').objectStore('records').index('waybill');idx.openCursor(IDBKeyRange.only(no)).onsuccess=e=>{const c=e.target.result;if(c){out.push(c.value);c.continue()}else res(out.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)))};idx.onerror=()=>rej(idx.error)})}
+async function renderResults(){const arr=await query($('searchNo').value);const box=$('results');box.innerHTML='';if(!arr.length){box.innerHTML='<div class="hint">没查到这个单号。</div>';return}arr.forEach(r=>{const url=URL.createObjectURL(r.blob);const el=document.createElement('div');el.className='record';el.innerHTML=`<b>${r.waybill}</b><div class="mini">${new Date(r.createdAt).toLocaleString('zh-CN',{hour12:false})}｜${Math.round(r.durationMs/1000)}秒｜${r.operator||''}</div><video src="${url}" controls playsinline></video><p><a href="${url}" download="${r.waybill}.webm" style="color:#93c5fd">下载视频</a></p>`;box.appendChild(el)})}
+
+async function startCamera(){
+  if(work.stream) return;
+  work.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:work.facing,width:{ideal:1920},height:{ideal:1080},focusMode:'continuous'},audio:false});
+  video.srcObject=work.stream; work.track=work.stream.getVideoTracks()[0];
+  await video.play();
+  try{barcodeDetector=new BarcodeDetector({formats:['code_128','code_39','ean_13','qr_code','data_matrix']})}catch(e){barcodeDetector=null}
+}
+function stopCamera(){ if(work.stream){work.stream.getTracks().forEach(t=>t.stop());work.stream=null;work.track=null;video.srcObject=null} }
+async function startWork(){
+  await startCamera();
+  work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0;
+  $('btnStart').disabled=true;$('btnStop').disabled=false;$('btnScan').disabled=false;$('btnFinish').disabled=!isRecording;
+  status('工作中','自动识别面单号；本地失败会调用AI兜底。');
+  log('开始工作：摄像头已打开，自动流水已启动','ok');
+  if(work.scanTimer) clearInterval(work.scanTimer);
+  work.scanTimer=setInterval(scanLoop,680);
+  setTimeout(scanLoop,200);
+}
+async function stopWork(){
+  work.active=false; if(work.scanTimer) clearInterval(work.scanTimer); work.scanTimer=null;
+  if(isRecording) await finishRecording('停止工作自动保存');
+  stopCamera(); $('btnStart').disabled=false;$('btnStop').disabled=true;$('btnScan').disabled=true;$('btnFinish').disabled=true;
+  status('已停止','摄像头已关闭，自动流水已停止。'); $('recPill').textContent='未录制'; log('已停止工作','warn');
+}
+async function switchCam(){
+  work.facing=work.facing==='environment'?'user':'environment';
+  const was=work.active; if(work.stream) stopCamera(); if(was){await startCamera(); log('已切换摄像头：'+(work.facing==='user'?'前置':'后置'),'ok')}
+}
+function capture(maxW=1280){if(!video.videoWidth)return null;const vw=video.videoWidth,vh=video.videoHeight;const scale=Math.min(1,maxW/vw);frame.width=Math.round(vw*scale);frame.height=Math.round(vh*scale);fctx.drawImage(video,0,0,frame.width,frame.height);return {canvas:frame,w:frame.width,h:frame.height}}
+function crop(src,b){const c=document.createElement('canvas');const x=Math.max(0,Math.round(b.x)),y=Math.max(0,Math.round(b.y));const w=Math.min(src.w-x,Math.round(b.w)),h=Math.min(src.h-y,Math.round(b.h));c.width=Math.max(1,w);c.height=Math.max(1,h);c.getContext('2d').drawImage(src.canvas,x,y,w,h,0,0,w,h);return c}
+function findLabel(src){
+  const w=src.w,h=src.h, img=fctx.getImageData(0,0,w,h).data; let minX=w,minY=h,maxX=0,maxY=0,count=0;
+  const step=8;
+  for(let y=0;y<h;y+=step){for(let x=0;x<w;x+=step){const i=(y*w+x)*4,r=img[i],g=img[i+1],b=img[i+2];const bright=(r+g+b)/3, sat=Math.max(r,g,b)-Math.min(r,g,b); if(bright>150 && sat<70){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);count++}}}
+  if(count<80) return {x:w*.04,y:h*.04,w:w*.92,h:h*.88};
+  const pad=30; minX=Math.max(0,minX-pad);minY=Math.max(0,minY-pad);maxX=Math.min(w,maxX+pad);maxY=Math.min(h,maxY+pad);
+  const bw=maxX-minX,bh=maxY-minY;if(bw<200||bh<200)return {x:w*.04,y:h*.04,w:w*.92,h:h*.88};
+  return {x:minX,y:minY,w:bw,h:bh};
+}
+function makeZones(label){
+  const w=label.width,h=label.height;
+  const z=(name,x,y,ww,hh)=>({name,canvas:crop({canvas:label,w,h},{x:x*w,y:y*h,w:ww*w,h:hh*h})});
+  return [
+    z('顶部条码和下方单号',.02,.00,.96,.27),
+    z('顶部数字单号加宽',.02,.09,.96,.17),
+    z('右侧竖向单号',.62,.02,.36,.64),
+    z('右边缘竖向单号',.74,.00,.24,.82),
+    z('左/边缘兜底',.00,.02,.24,.82),
+    {name:'整张面单',canvas:label}
+  ];
+}
+function preprocess(c){
+  const out=document.createElement('canvas');const scale=Math.min(3,Math.max(1.6,900/Math.max(c.width,c.height)));out.width=Math.round(c.width*scale);out.height=Math.round(c.height*scale);const ctx=out.getContext('2d');ctx.drawImage(c,0,0,out.width,out.height);const img=ctx.getImageData(0,0,out.width,out.height);const d=img.data;for(let i=0;i<d.length;i+=4){let v=(d[i]*.299+d[i+1]*.587+d[i+2]*.114);v=(v-128)*1.45+128;v=v>145?255:(v<90?0:v);d[i]=d[i+1]=d[i+2]=v}ctx.putImageData(img,0,0);return out}
+function rotateCanvas(c,deg){if(!deg)return c;const r=document.createElement('canvas'),ctx=r.getContext('2d');const rad=deg*Math.PI/180;if(Math.abs(deg)%180===90){r.width=c.height;r.height=c.width}else{r.width=c.width;r.height=c.height}ctx.translate(r.width/2,r.height/2);ctx.rotate(rad);ctx.drawImage(c,-c.width/2,-c.height/2);return r}
+function numsFromText(t){return [...String(t||'').matchAll(/\d[\d\s\-]{10,20}\d/g)].map(m=>norm(m[0])).filter(valid)}
+async function localBarcode(zones){
+  if(!barcodeDetector) return [];
+  const out=[];
+  for(const z of zones.slice(0,5)){
+    for(const deg of [0,90,-90,180]){
+      try{const c=rotateCanvas(z.canvas,deg);const arr=await barcodeDetector.detect(c);for(const b of arr){const n=norm(b.rawValue);if(valid(n))out.push({num:n,src:'条码:'+z.name})}}catch(e){}
+      if(out.length) return out;
+    }
+  }
+  return out;
+}
+async function localOCR(zones){
+  if(!window.Tesseract) return [];
+  const out=[];
+  const todo=[zones[0],zones[1],zones[2],zones[3]];
+  for(const z of todo){
+    for(const deg of (z.name.includes('竖')||z.name.includes('边')?[0,90,-90,180]:[0,180])){
+      const img=preprocess(rotateCanvas(z.canvas,deg));
+      try{
+        const r=await Tesseract.recognize(img,'eng',{logger:()=>{}, tessedit_char_whitelist:'0123456789', preserve_interword_spaces:'1'});
+        const nums=numsFromText(r.data.text); nums.forEach(n=>out.push({num:n,src:'OCR:'+z.name}));
+        if(out.length>=2) return out;
+      }catch(e){}
+    }
+  }
+  return out;
+}
+function regionKey(src){
+  src=String(src||'');
+  if(src.includes('扫码枪')) return 'scanner';
+  if(src.includes('条码')) return 'barcode';
+  if(src.includes('顶部')) return 'top';
+  if(src.includes('右侧')||src.includes('右边')) return 'right';
+  if(src.includes('左')||src.includes('边缘')) return 'edge';
+  if(src.includes('AI确认')) return 'ai-confirmed';
+  if(src.includes('整张')) return 'full';
+  return src;
+}
+function consensus(items){
+  const map={};
+  for(const it of items){
+    const n=norm(it.num); if(!valid(n)) continue;
+    map[n]??={num:n,srcs:new Set(),regions:new Set(),barcode:false};
+    map[n].srcs.add(it.src||'未知');
+    const rk=regionKey(it.src||'');
+    map[n].regions.add(rk);
+    if(rk==='barcode') map[n].barcode=true;
+  }
+  for(const v of Object.values(map)){
+    // 条码本身可靠，允许单处条码直接通过；OCR/AI必须两处区域一致。
+    if(v.barcode) return {num:v.num,src:[...v.srcs].join(' + ')};
+    const effective=[...v.regions].filter(r=>!['full'].includes(r));
+    const hasTwo = effective.length>=2 || v.regions.has('ai-confirmed');
+    if(hasTwo) return {num:v.num,src:[...v.srcs].join(' + ')};
+  }
+  return null;
+}
+async function callAI(zones){
+  const endpoint=$('aiEndpoint').value.trim(); if(!endpoint || $('aiMode').value==='off') return [];
+  const now=Date.now(); if(now<work.aiCooldown) return [];
+  work.aiCooldown=now+3500;
+  const imgs=zones.slice(0,5).map(z=>({name:z.name,dataUrl:preprocess(z.canvas).toDataURL('image/jpeg',.86)}));
+  status('AI兜底识别中','只上传面单号小区域，不上传整张面单。');
+  try{
+    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs,hint:'中国邮政/EMS面单。严格只接受13位纯数字运单号，不限制首位。必须顶部横向条码下方数字、右侧竖向条码旁数字、边缘竖排数字中至少两处一致，才算confirmed。不要把手机号、路由码、日期、数量、重量当成单号。'})});
+    const j=await r.json(); if(!r.ok) throw new Error(j.error||r.statusText);
+    const arr=[];
+    if(j.confirmed && valid(j.waybill)) arr.push({num:j.waybill,src:'AI确认:'+((j.regions||[]).join('+')||'两处一致')});
+    if(Array.isArray(j.evidence)){
+      j.evidence.forEach(ev=>{ const n=norm(ev.waybill||ev.num||ev.text); if(valid(n)) arr.push({num:n,src:'AI:'+String(ev.region||'未知区域')}); });
+    }
+    // candidates只用于日志，不作为自动开录条件，避免AI单次猜错。
+    const logNums=[...new Set(arr.map(x=>x.num).concat((j.candidates||[]).map(norm).filter(valid)))];
+    if(arr.length) log('AI通过校验：'+arr.map(x=>x.src+'='+x.num).join(' / '),'ok');
+    else if(logNums.length) log('AI有候选但未满足两处一致：'+logNums.join('/'),'warn');
+    else log('AI未识别到有效单号','warn');
+    return arr;
+  }catch(e){log('AI识别失败：'+e.message,'bad');return []}
+}
+async function scanLoop(force=false){
+  if(!work.active || work.busy || !work.stream) return; work.busy=true;
+  try{
+    const src=capture(1280); if(!src) return;
+    const box=findLabel(src); const label=crop(src,box); const zones=makeZones(label);
+    let items=await localBarcode(zones);
+    let hit=consensus(items);
+    if(!hit){ const o=await localOCR(zones); items=items.concat(o); hit=consensus(items); }
+    if(!hit && (force || ++work.localFail>=2)){ const a=await callAI(zones); items=items.concat(a); hit=consensus(items); }
+    if(hit){
+      work.localFail=0; $('detectedNo').textContent=hit.num; $('sourceText').textContent=hit.src; status('校验通过',hit.num+'｜'+hit.src); pulse();
+      if(hit.num!==recordingNo && work.lastSuccessSpoken!==hit.num){speak('success');work.lastSuccessSpoken=hit.num}
+      await handleWaybill(hit.num);
+    }else{
+      const srcs=[...new Set(items.map(x=>x.src+':'+x.num))]; $('detectedNo').textContent=srcs.join(' / ')||'-'; $('sourceText').textContent=srcs.length?'未一致':'未识别';
+      status('识别中','请让顶部条码和右侧条码都进入画面，保持1秒。');
+      if(work.localFail>=4){speak('fail'); work.localFail=0}
+    }
+  }catch(e){log('扫描出错：'+e.message,'bad')}
+  finally{work.busy=false}
+}
+async function handleWaybill(no){no=norm(no); if(!valid(no))return; if(!isRecording){startRecording(no);return} if(no===recordingNo)return; await finishRecording('检测到新面单，自动保存上一单'); startRecording(no)}
+function startRecording(no){if(!work.stream)return;chunks=[];recStart=Date.now();recordingNo=no;const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm;codecs=vp8')?'video/webm;codecs=vp8':'video/webm';mediaRecorder=new MediaRecorder(work.stream,{mimeType:mime,videoBitsPerSecond:2500000});mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};mediaRecorder.onstart=()=>{isRecording=true;$('currentNo').textContent=no;$('btnFinish').disabled=false;$('recPill').textContent='录制中 '+no;status('开始录制',no);log('开始录制：'+no,'ok');speak('start')};mediaRecorder.start(1000)}
+async function finishRecording(reason='手动完成'){if(!isRecording||!mediaRecorder)return;return new Promise(res=>{const no=recordingNo,st=recStart,ed=Date.now();mediaRecorder.onstop=async()=>{const blob=new Blob(chunks,{type:mediaRecorder.mimeType||'video/webm'});isRecording=false;recordingNo=null;$('currentNo').textContent='-';$('btnFinish').disabled=true;$('recPill').textContent='未录制';if(blob.size)await saveRecord(no,blob,st,ed,reason);chunks=[];res()};try{mediaRecorder.stop()}catch(e){res()}})}
+function setupScanner(){
+  let buf='',last=0;
+  document.addEventListener('keydown',async e=>{
+    const tag=(e.target&&e.target.tagName||'').toLowerCase();
+    if(tag==='input'||tag==='textarea'||tag==='select')return;
+    const now=Date.now(); if(now-last>900)buf=''; last=now;
+    if(/^\d$/.test(e.key)){buf+=e.key;if(buf.length>18)buf=buf.slice(-18)}
+    else if(e.key==='Enter'){const n=norm(buf);buf='';if(valid(n)){e.preventDefault();if(work.active)await handleWaybill(n);$('detectedNo').textContent=n;$('sourceText').textContent='扫码枪/键盘';log('扫码枪：'+n,'ok')}} 
+  });
+}
+$('btnStart').onclick=()=>startWork().catch(e=>{alert('开启失败：'+e.message);log('开启失败：'+e.message,'bad')});
+$('btnStop').onclick=()=>stopWork();
+$('btnScan').onclick=()=>scanLoop(true);
+$('btnFinish').onclick=()=>finishRecording('手动完成');
+$('btnSwitchCam').onclick=()=>switchCam();
+$('btnVoice').onclick=testVoice;
+$('btnPanel').onclick=()=>side.classList.toggle('open');
+$('btnSaveCfg').onclick=saveCfg;
+$('btnSearch').onclick=renderResults;
+$('btnManual').onclick=()=>{const n=norm($('manualNo').value);if(!valid(n))return alert('单号格式不对');if(!work.active)return alert('请先点开始工作');handleWaybill(n)};
+setupScanner();
+log('V18已加载：严格校验版。OCR/AI必须两处一致才自动录制；扫码枪和条码优先。');
+</script>
+</body>
+</html>
