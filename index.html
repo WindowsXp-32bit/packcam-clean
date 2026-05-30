@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>打包发货视频记录 V26 SaaS项目版</title>
+<title>打包发货视频记录 V27 登录按钮修复版</title>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://unpkg.com/@zxing/browser@latest/umd/index.min.js"></script>
 <style>
@@ -136,7 +136,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
     </div>
   </section>
   <aside class="side" id="side">
-    <h1>V26 SaaS项目版</h1>
+    <h1>V27 登录按钮修复版</h1>
     <div class="sub">多引擎并行识别：条码、OCR、AI 同时候选；两种识别方式得到同一13位单号才自动录制。扫码枪/键盘仍直接触发。</div>
 
     <div class="card">
@@ -180,7 +180,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
       </div>
       <label>员工/打包台备注</label>
       <input id="operator" placeholder="例如：1号打包台"/>
-      <div class="hint">V26正式项目雏形：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
+      <div class="hint">V27登录修复版：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
     </div>
     <div class="card">
       <label>手动/扫码枪单号</label>
@@ -574,7 +574,7 @@ function consensus(items){
   }
   return null;
 }
-async function callAIasync function callAI(zones){
+async function callAI(zones){
   const endpoint=$('aiEndpoint').value.trim(); if(!endpoint || $('aiMode').value==='off') return [];
   const now=Date.now(); if(now<work.aiCooldown) return [];
   work.aiCooldown=now+3500;
@@ -642,7 +642,7 @@ async function scanLoop(force=false){
   }catch(e){log('扫描出错：'+e.message,'bad')}
   finally{work.busy=false}
 }
-async function handleWaybillasync function handleWaybill(no){no=norm(no); if(!valid(no))return; if(!isRecording){startRecording(no);return} if(no===recordingNo)return; await finishRecording('检测到新面单，自动保存上一单'); startRecording(no)}
+async function handleWaybill(no){no=norm(no); if(!valid(no))return; if(!isRecording){startRecording(no);return} if(no===recordingNo)return; await finishRecording('检测到新面单，自动保存上一单'); startRecording(no)}
 function startRecording(no){if(!work.stream)return;updateScanInfo({stage:'开始录制',confirm:'通过',reason:'正在录制单号 '+no});chunks=[];recStart=Date.now();recordingNo=no;const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm;codecs=vp8')?'video/webm;codecs=vp8':'video/webm';mediaRecorder=new MediaRecorder(work.stream,{mimeType:mime,videoBitsPerSecond:2500000});mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};mediaRecorder.onstart=()=>{isRecording=true;updateScanEffect();$('currentNo').textContent=no;$('btnFinish').disabled=false;$('recPill').textContent='录制中 '+no;status('开始录制',no);log('开始录制：'+no,'ok');speak('start')};mediaRecorder.start(1000)}
 async function finishRecording(reason='手动完成'){if(!isRecording||!mediaRecorder)return;return new Promise(res=>{const no=recordingNo,st=recStart,ed=Date.now();mediaRecorder.onstop=async()=>{const blob=new Blob(chunks,{type:mediaRecorder.mimeType||'video/webm'});isRecording=false;recordingNo=null;updateScanEffect();$('currentNo').textContent='-';$('btnFinish').disabled=true;$('recPill').textContent='未录制';if(blob.size)await saveRecord(no,blob,st,ed,reason);chunks=[];res()};try{mediaRecorder.stop()}catch(e){res()}})}
 function setupScanner(){
@@ -670,7 +670,7 @@ setupAuthUI();
 setupScanner();
 refreshScannerButton();
 updateScanEffect();
-log('V26已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
+log('V27已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
 </script>
 </body>
 </html>
