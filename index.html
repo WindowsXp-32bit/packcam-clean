@@ -137,7 +137,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
   </section>
   <aside class="side" id="side">
     <h1>V27 登录按钮修复版</h1>
-    <div class="sub">多引擎并行识别：条码、OCR、AI 同时候选；两种识别方式得到同一13位单号才自动录制。扫码枪/键盘仍直接触发。</div>
+    <div class="sub">准快平衡：顶部高可信区域2次同号可快速锁定；侧边/边缘候选需更多确认，尽量做到又准又快。</div>
 
     <div class="card">
       <div class="kv"><div class="k">账号</div><div class="v" id="accountName">未登录</div></div>
@@ -172,12 +172,19 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
         <div>
           <label>AI兜底</label>
           <select id="aiMode">
-            <option value="on" selected>开启：本地失败后调用AI</option>
-            <option value="off">关闭：只用条码/OCR/扫码枪</option>
+            <option value="on">开启：OCR失败后再调用AI</option>
+            <option value="off" selected>关闭：只用OCR/条码/扫码枪，最稳最快</option>
           </select>
         </div>
         <button id="btnSaveCfg" class="small">保存</button>
       </div>
+      <label>画质/性能模式</label>
+      <select id="qualityMode">
+        <option value="stable">稳定省电：720p，长时间运行更稳</option>
+        <option value="smart" selected>智能高清：1080p识别 + 录制中降频，推荐</option>
+        <option value="clear">高清识别：1080p + 更高清码率，识别优先</option>
+      </select>
+      <div class="mini">改模式后建议停止工作再重新开始。准快规则：顶部高可信区域连续2次同号即可锁定；顶部+侧边同号更稳；只有边缘兜底识别时需3次同号。</div>
       <label>员工/打包台备注</label>
       <input id="operator" placeholder="例如：1号打包台"/>
       <div class="hint">V27登录修复版：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
@@ -219,6 +226,9 @@ const work={active:false, stream:null, track:null, facing:'environment', scanTim
 let mediaRecorder=null,chunks=[],recordingNo=null,isRecording=false,recStart=0,savedCount=0,voicesReady=false;
 const frame=document.createElement('canvas'), fctx=frame.getContext('2d',{willReadFrequently:true});
 let barcodeDetector=null, zxingReader=null;
+let ocrWorker=null, ocrReady=false, ocrInitPromise=null, fastOcrHits={}, lastOcrCandidate='', lastOcrAt=0;
+let scanLoopTimer=null, statusUiLast=0, recordingGuardTimer=null, resultUrls=[];
+const OCR_CONFIRM_NEED=2, EDGE_CONFIRM_NEED=3, FAST_SCAN_DELAY=300, RECORDING_SCAN_DELAY=1300, MAX_RECORD_MS=8*60*1000;
 
 const audio={
   start:new Audio('audio/start.mp3'),
@@ -228,12 +238,22 @@ const audio={
 };
 Object.values(audio).forEach(a=>{a.preload='auto';a.volume=1});
 
-function log(s,type=''){const d=document.createElement('div');d.textContent='['+new Date().toLocaleTimeString('zh-CN',{hour12:false})+'] '+s;if(type==='ok')d.style.color='#86efac';if(type==='bad')d.style.color='#fca5a5';if(type==='warn')d.style.color='#fde68a';$('log').prepend(d)}
+function log(s,type=''){
+  const box=$('log'); if(!box) return;
+  const d=document.createElement('div');
+  d.textContent='['+new Date().toLocaleTimeString('zh-CN',{hour12:false})+'] '+s;
+  if(type==='ok')d.style.color='#86efac';if(type==='bad')d.style.color='#fca5a5';if(type==='warn')d.style.color='#fde68a';
+  box.prepend(d);
+  while(box.childNodes.length>80) box.removeChild(box.lastChild);
+}
 function status(a,b=''){ $('statusBox').innerHTML='<b>'+a+'</b><br><span class="muted">'+b+'</span>'; $('workState').textContent=a+(b?' - '+b:''); }
 
 const scanInfoState={stage:'未开始',barcode:'-',ocr:'-',ai:'-',confirm:'0/2',reason:'等待开始工作'};
 function updateScanInfo(p={}){
   Object.assign(scanInfoState,p);
+  const now=Date.now();
+  if(!p.force && now-statusUiLast<180) return;
+  statusUiLast=now;
   const el=$('scanInfo'); if(el) el.classList.toggle('active', !!work.active);
   const set=(id,val,cls='')=>{const e=$(id); if(!e) return; e.textContent=val||'-'; e.className=cls||((!val||val==='-'||val==='0/2')?'muted':'')};
   set('scanStage',scanInfoState.stage, scanInfoState.stage.includes('成功')?'ok':'');
@@ -261,7 +281,19 @@ function valid(n){
 }
 function speak(key){ if(!work.active && key!=='test') return; const a= audio[key]||audio.success; try{a.pause();a.currentTime=0;a.play().catch(()=>{}); if(navigator.vibrate) navigator.vibrate(key==='fail'?[120,60,120]:[80]);}catch(e){} }
 function testVoice(){ audio.success.play().catch(()=>{}); setTimeout(()=>audio.start.play().catch(()=>{}),500); setTimeout(()=>audio.complete.play().catch(()=>{}),1050); }
-function saveCfg(){ localStorage.setItem('packcam_ai_endpoint',$('aiEndpoint').value.trim()); localStorage.setItem('packcam_ai_mode',$('aiMode').value); log('设置已保存','ok') }
+function saveCfg(){
+  localStorage.setItem('packcam_ai_endpoint',$('aiEndpoint').value.trim());
+  localStorage.setItem('packcam_ai_mode',$('aiMode').value);
+  localStorage.setItem('packcam_quality_mode',$('qualityMode')?$('qualityMode').value:'smart');
+  log('设置已保存。画质模式变更后，建议停止工作再重新开始。','ok')
+}
+function qualityMode(){ return ($('qualityMode')&&$('qualityMode').value) || localStorage.getItem('packcam_quality_mode') || 'smart'; }
+function qualityProfile(){
+  const m=qualityMode();
+  if(m==='stable') return {mode:m,w:1280,h:720,bitrate:1500000,ocrIdle:950,ocrRec:760,label:'稳定省电720p'};
+  if(m==='clear') return {mode:m,w:1920,h:1080,bitrate:2400000,ocrIdle:1320,ocrRec:900,label:'高清识别1080p'};
+  return {mode:'smart',w:1920,h:1080,bitrate:1800000,ocrIdle:1180,ocrRec:820,label:'智能高清1080p'};
+}
 
 let currentUser=null;
 let authMode='login';
@@ -366,17 +398,42 @@ function setupAuthUI(){
   if(authToken() && apiBase()) refreshAccount(); else showAuth();
 }
 
-function loadCfg(){ $('aiEndpoint').value=localStorage.getItem('packcam_ai_endpoint')||''; $('aiMode').value=localStorage.getItem('packcam_ai_mode')||'on'; }
+function loadCfg(){
+  $('aiEndpoint').value=localStorage.getItem('packcam_ai_endpoint')||'';
+  $('aiMode').value=localStorage.getItem('packcam_ai_mode')||'off';
+  if($('qualityMode')) $('qualityMode').value=localStorage.getItem('packcam_quality_mode')||'smart';
+}
 loadCfg();
 
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open('packcam_ai_v17',1);r.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('records')){const s=db.createObjectStore('records',{keyPath:'id'});s.createIndex('waybill','waybill',{unique:false});s.createIndex('createdAt','createdAt',{unique:false})}};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 async function saveRecord(no,blob,startAt,endAt,reason){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('records','readwrite');tx.objectStore('records').put({id:Date.now()+'_'+no,waybill:no,blob,startAt,endAt,reason,operator:$('operator').value||'',createdAt:new Date().toISOString(),durationMs:endAt-startAt});tx.oncomplete=()=>{savedCount++;$('savedCount').textContent=savedCount;speak('complete');log('本单录制完成：'+no,'ok');res()};tx.onerror=()=>rej(tx.error)})}
 async function query(no){no=norm(no);const db=await openDB();return new Promise((res,rej)=>{const out=[];const idx=db.transaction('records').objectStore('records').index('waybill');idx.openCursor(IDBKeyRange.only(no)).onsuccess=e=>{const c=e.target.result;if(c){out.push(c.value);c.continue()}else res(out.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)))};idx.onerror=()=>rej(idx.error)})}
-async function renderResults(){const arr=await query($('searchNo').value);const box=$('results');box.innerHTML='';if(!arr.length){box.innerHTML='<div class="hint">没查到这个单号。</div>';return}arr.forEach(r=>{const url=URL.createObjectURL(r.blob);const el=document.createElement('div');el.className='record';el.innerHTML=`<b>${r.waybill}</b><div class="mini">${new Date(r.createdAt).toLocaleString('zh-CN',{hour12:false})}｜${Math.round(r.durationMs/1000)}秒｜${r.operator||''}</div><video src="${url}" controls playsinline></video><p><a href="${url}" download="${r.waybill}.webm" style="color:#93c5fd">下载视频</a></p>`;box.appendChild(el)})}
+async function renderResults(){
+  resultUrls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(e){}});
+  resultUrls=[];
+  const arr=await query($('searchNo').value);
+  const box=$('results'); box.innerHTML='';
+  if(!arr.length){box.innerHTML='<div class="hint">没查到这个单号。</div>';return}
+  arr.slice(0,20).forEach(r=>{
+    const url=URL.createObjectURL(r.blob); resultUrls.push(url);
+    const el=document.createElement('div'); el.className='record';
+    el.innerHTML=`<b>${r.waybill}</b><div class="mini">${new Date(r.createdAt).toLocaleString('zh-CN',{hour12:false})}｜${Math.round(r.durationMs/1000)}秒｜${r.operator||''}</div><video src="${url}" controls playsinline preload="metadata"></video><p><a href="${url}" download="${r.waybill}.webm" style="color:#93c5fd">下载视频</a></p>`;
+    box.appendChild(el);
+  });
+}
 
 async function startCamera(){
   if(work.stream) return;
-  work.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:work.facing,width:{ideal:1920},height:{ideal:1080},focusMode:'continuous'},audio:false});
+  const q=qualityProfile();
+  try{
+    work.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:work.facing,width:{ideal:q.w},height:{ideal:q.h},focusMode:'continuous'},audio:false});
+    log('摄像头模式：'+q.label,'ok');
+  }catch(e){
+    if(q.mode!=='stable'){
+      log('高清摄像头打开失败，自动降级到720p：'+e.message,'warn');
+      work.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:work.facing,width:{ideal:1280},height:{ideal:720},focusMode:'continuous'},audio:false});
+    }else{ throw e; }
+  }
   video.srcObject=work.stream; work.track=work.stream.getVideoTracks()[0];
   await video.play();
   try{barcodeDetector=new BarcodeDetector({formats:['code_128','code_39','ean_13','qr_code','data_matrix']})}catch(e){barcodeDetector=null}
@@ -386,18 +443,16 @@ function stopCamera(){ if(work.stream){work.stream.getTracks().forEach(t=>t.stop
 async function startWork(){
   if(!(await ensureAccountActive())) return;
   await startCamera();
-  work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0; work.loopCount=0;
+  work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0; work.loopCount=0; fastOcrHits={}; lastOcrCandidate='';
   $('btnStart').disabled=true;$('btnStop').disabled=false;$('btnScan').disabled=false;$('btnFinish').disabled=!isRecording;
-  status('工作中',work.phoneScanner?'专门扫码框优先扫条码；扫不到再OCR/AI。':'自动识别面单号；本地失败会调用AI兜底。');
-  log('开始工作：摄像头已打开，真条码扫描框已启动','ok');
+  status('工作中','准快平衡：顶部单号2次同号快速锁定，低可信候选继续复核。当前：'+qualityProfile().label);
+  log('开始工作：准快平衡模式已启动，又快又准｜'+qualityProfile().label,'ok');
   updateScanEffect();
-  updateScanInfo({stage:'条码扫描',barcode:'-',ocr:'-',ai:'-',confirm:'0/2',reason:'请把顶部横向条码放进绿色框，保持0.5～1秒'});
-  if(work.scanTimer) clearInterval(work.scanTimer);
-  work.scanTimer=setInterval(scanLoop,480);
-  setTimeout(scanLoop,200);
+  updateScanInfo({stage:'OCR准快识别',barcode:'-',ocr:'-',ai:'关闭',confirm:'0/2',reason:'请优先让顶部横向单号清晰入镜；顶部2次同号即可锁定',force:true});
+  if(work.scanTimer) clearInterval(work.scanTimer); work.scanTimer=null; if(scanLoopTimer) clearTimeout(scanLoopTimer); ensureOCR(); scheduleNextScan(150);
 }
 async function stopWork(){
-  work.active=false; if(work.scanTimer) clearInterval(work.scanTimer); work.scanTimer=null;
+  work.active=false; if(work.scanTimer) clearInterval(work.scanTimer); work.scanTimer=null; if(scanLoopTimer) clearTimeout(scanLoopTimer); scanLoopTimer=null; if(recordingGuardTimer) clearTimeout(recordingGuardTimer); recordingGuardTimer=null;
   if(isRecording) await finishRecording('停止工作自动保存');
   stopCamera(); $('btnStart').disabled=false;$('btnStop').disabled=true;$('btnScan').disabled=true;$('btnFinish').disabled=true;
   status('已停止','摄像头已关闭，自动流水已停止。'); $('recPill').textContent='未录制'; updateScanEffect(); updateScanInfo({stage:'已停止',barcode:'-',ocr:'-',ai:'-',confirm:'0/2',reason:'等待开始工作'}); log('已停止工作','warn');
@@ -522,21 +577,164 @@ async function localBarcode(zones){
   }
   return out;
 }
+
+async function ensureOCR(){
+  if(ocrReady && ocrWorker) return true;
+  if(ocrInitPromise) return ocrInitPromise;
+  if(!window.Tesseract) return false;
+  ocrInitPromise=(async()=>{
+    try{
+      updateScanInfo({stage:'OCR初始化',reason:'首次加载OCR，后续会快很多'});
+      if(window.Tesseract.createWorker){
+        try{ ocrWorker=await Tesseract.createWorker('eng'); }
+        catch(e){
+          ocrWorker=await Tesseract.createWorker();
+          if(ocrWorker.loadLanguage) await ocrWorker.loadLanguage('eng');
+          if(ocrWorker.initialize) await ocrWorker.initialize('eng');
+        }
+        if(ocrWorker.setParameters){
+          await ocrWorker.setParameters({
+            tessedit_char_whitelist:'0123456789',
+            preserve_interword_spaces:'0',
+            user_defined_dpi:'190'
+          });
+        }
+        ocrReady=true;
+        log('OCR稳定模式已就绪：模型只加载一次','ok');
+        return true;
+      }
+    }catch(e){ log('OCR初始化失败：'+e.message,'warn'); }
+    return false;
+  })();
+  return ocrInitPromise;
+}
+function preprocessFast(c, rotate=0){
+  c=rotateCanvas(c,rotate);
+  const out=document.createElement('canvas');
+  const maxSide=isRecording?560:680;
+  const scale=Math.min(2,Math.max(1.15,maxSide/Math.max(c.width,c.height)));
+  out.width=Math.max(1,Math.round(c.width*scale));
+  out.height=Math.max(1,Math.round(c.height*scale));
+  const ctx=out.getContext('2d',{willReadFrequently:true});
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(c,0,0,out.width,out.height);
+  const img=ctx.getImageData(0,0,out.width,out.height), d=img.data;
+  for(let i=0;i<d.length;i+=4){
+    let v=d[i]*.299+d[i+1]*.587+d[i+2]*.114;
+    v=(v-128)*1.75+128;
+    v=v>150?255:(v<105?0:v);
+    d[i]=d[i+1]=d[i+2]=v;
+  }
+  ctx.putImageData(img,0,0);
+  return out;
+}
+async function recognizeFastCanvas(canvas){
+  if(await ensureOCR()){
+    try{ const r=await ocrWorker.recognize(canvas); return (r&&r.data&&r.data.text)||''; }
+    catch(e){ log('OCR识别异常：'+e.message,'warn'); }
+  }
+  return '';
+}
+function rememberOcr(nums, src){
+  const now=Date.now(), out=[];
+  for(const [k,v] of Object.entries(fastOcrHits)){ if(now-v.last>4000) delete fastOcrHits[k]; }
+  nums.forEach(n=>{
+    if(!valid(n)) return;
+    fastOcrHits[n]??={count:0,last:0,srcs:new Set()};
+    const rec=fastOcrHits[n];
+    if(now-rec.last>450){ rec.count++; rec.last=now; }
+    rec.srcs.add(src);
+    out.push({num:n,src:'OCR:'+src+':'+rec.count+'/'+OCR_CONFIRM_NEED});
+  });
+  return out;
+}
+
 async function localOCR(zones){
   if(!window.Tesseract) return [];
   const out=[];
-  const todo=[zones[0],zones[1],zones[2],zones[3]];
-  for(const z of todo){
-    for(const deg of (z.name.includes('竖')||z.name.includes('边')?[0,90,-90,180]:[0,180])){
-      const img=preprocess(rotateCanvas(z.canvas,deg));
-      try{
-        const r=await Tesseract.recognize(img,'eng',{logger:()=>{}, tessedit_char_whitelist:'0123456789', preserve_interword_spaces:'1'});
-        const nums=numsFromText(r.data.text); if(nums.length) updateScanInfo({stage:'OCR识别',ocr:nums.join('/'),reason:'OCR候选：'+nums.join('/')}); nums.forEach(n=>out.push({num:n,src:'OCR:'+z.name}));
-        if(out.length>=2) return out;
-      }catch(e){}
+  const top=zones.find(z=>z.name.includes('顶部数字')) || zones[1] || zones[0];
+  const topFull=zones.find(z=>z.name.includes('顶部条码')) || zones[0];
+  const right=zones.find(z=>z.name.includes('右侧')) || zones[2];
+  const edge=zones.find(z=>z.name.includes('边缘')) || zones[3];
+
+  const scanOne = async (z, deg, name)=>{
+    if(!z) return [];
+    const img=preprocessFast(z.canvas,deg);
+    const text=await recognizeFastCanvas(img);
+    const nums=numsFromText(text);
+    if(nums.length){
+      updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR准快识别',ocr:nums.join('/'),reason:name+' 候选：'+nums.join('/')});
+      const items=rememberOcr(nums,name);
+      lastOcrCandidate=nums[0]; lastOcrAt=Date.now();
+      return items;
+    }
+    return [];
+  };
+
+  // 1) 顶部数字区优先，最快、最高可信
+  out.push(...await scanOne(top,0,'顶部数字区'));
+  let hit=ocrStable(out);
+  if(hit || out.length) {
+    // 顶部刚出现候选但还没锁定时，立即补扫右侧一次，争取同一轮多区域确认
+    if(!hit && !isRecording && right) out.push(...await scanOne(right,90,'右侧竖排'));
+    return out;
+  }
+
+  // 2) 顶部条码下方再扫一次，提升顶部命中率
+  out.push(...await scanOne(topFull,0,'顶部条码下方'));
+  hit=ocrStable(out);
+  if(hit || out.length) {
+    if(!hit && !isRecording && right) out.push(...await scanOne(right,90,'右侧竖排'));
+    return out;
+  }
+
+  // 3) 未命中顶部时，再扫右侧；边缘只低频兜底
+  if(!isRecording || (work.loopCount||0)%2===0){
+    if(right){
+      out.push(...await scanOne(right,90,'右侧竖排'));
+      if(out.length) return out;
+      out.push(...await scanOne(right,-90,'右侧竖排'));
+      if(out.length) return out;
     }
   }
+  if(!isRecording && (work.loopCount||0)%3===0 && edge){
+    out.push(...await scanOne(edge,90,'边缘竖排'));
+    if(out.length) return out;
+    out.push(...await scanOne(edge,-90,'边缘竖排'));
+    if(out.length) return out;
+  }
+
+  updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR准快识别',ocr:'-',reason:isRecording?'录制中低频扫描，减少卡顿':'暂未读到13位单号，继续扫描'});
   return out;
+}
+function ocrStable(items){
+  for(const it of items){
+    const n=norm(it.num);
+    const rec=fastOcrHits[n];
+    if(!valid(n) || !rec) continue;
+    const srcs=[...rec.srcs];
+    const hasTop=srcs.some(s=>s.includes('顶部'));
+    const hasRight=srcs.some(s=>s.includes('右侧'));
+    const hasEdge=srcs.some(s=>s.includes('边缘'));
+    const multiRegion=hasTop && (hasRight || hasEdge);
+
+    // V32 准快平衡：
+    // 1) 顶部 + 右侧/边缘同号：2次直接锁定，最快也较准；
+    // 2) 顶部高可信区域单独连续2次：锁定；
+    // 3) 只有右侧竖排：连续2次锁定；
+    // 4) 只有边缘兜底：连续3次才锁定，防止误绑。
+    let need=OCR_CONFIRM_NEED;
+    let mode='OCR多帧稳定';
+    if(multiRegion){ need=2; mode='OCR多区域一致'; }
+    else if(hasTop){ need=2; mode='OCR顶部高可信'; }
+    else if(hasRight){ need=2; mode='OCR右侧稳定'; }
+    else if(hasEdge){ need=EDGE_CONFIRM_NEED; mode='OCR边缘严格'; }
+
+    if(rec.count>=need){
+      return {num:n,src:'OCR准快锁定 '+rec.count+'/'+need+'｜'+srcs.join('+'),engines:mode};
+    }
+  }
+  return null;
 }
 function regionKey(src){
   src=String(src||'');
@@ -598,53 +796,88 @@ async function callAI(zones){
   }catch(e){log('AI识别失败：'+e.message,'bad');return []}
 }
 async function scanLoop(force=false){
-  if(!work.active || work.busy || !work.stream) return; work.busy=true;
+  if(!work.active || work.busy || !work.stream || document.hidden) return;
+  work.busy=true;
   try{
-    const src=capture(1280); if(!src) return;
-    updateScanInfo({stage:'多引擎识别',reason:'条码/OCR/AI并行候选，需两种方式同号'});
+    const q=qualityProfile(); const src=capture(isRecording?q.ocrRec:q.ocrIdle); if(!src) return;
+    updateScanInfo({stage:isRecording?'录制中低频扫描':'OCR极速识别',reason:isRecording?'录制中自动降频，避免卡顿':'OCR准快识别中：顶部2次同号快速锁定，侧边/边缘需更严格确认'});
     const scanZone={name:'扫码框区域',canvas:crop(src,scanBoxRegion(src))};
     const box=findLabel(src); const label=crop(src,box); const zones=[scanZone,...makeZones(label)];
     work.loopCount=(work.loopCount||0)+1;
     let items=[];
 
-    // 1) 条码引擎：扫码框、顶部、侧边多区域尝试
-    const ps=await phoneScannerScan(src,zones); items=items.concat(ps);
-    const b=await localBarcode(zones); items=items.concat(b);
-
-    // 2) OCR引擎：每轮都跑关键区域，和条码/AI交叉验证
     const o=await localOCR(zones); items=items.concat(o);
+    let hit=ocrStable(items);
 
-    // 3) AI引擎：有冷却，避免每帧都请求；本地已有候选或强制补扫时更积极
-    const hasLocalCandidate = items.some(x=>valid(x.num));
-    if(force || hasLocalCandidate || work.loopCount%2===0){
-      const a=await callAI(zones); items=items.concat(a);
+    // 条码辅助降频运行，避免录制时抢CPU
+    if(!hit && (force || (!isRecording && work.loopCount%3===0) || (isRecording && work.loopCount%5===0))){
+      const ps=await phoneScannerScan(src,zones); items=items.concat(ps);
+      const b=await localBarcode(zones); items=items.concat(b);
+      hit=consensus(items) || ocrStable(items);
     }
 
-    const hit=consensus(items);
+    // AI默认关闭；开启时也只在未录制且多次失败后调用
+    if(!hit && !isRecording && $('aiMode').value==='on' && (force || work.localFail>=8)){
+      const a=await callAI(zones); items=items.concat(a);
+      hit=consensus(items) || ocrStable(items);
+    }
+
     if(hit){
       work.localFail=0;
       $('detectedNo').textContent=hit.num;
       $('sourceText').textContent=hit.src;
-      status('多引擎确认通过', hit.num+'｜'+(hit.engines||hit.src));
-      updateScanInfo({stage:'校验成功',confirm:'通过',reason:'两种识别方式同号：'+(hit.engines||hit.src)});
+      status(isRecording?'检测到下一单':'OCR确认通过', hit.num+'｜'+(hit.engines||hit.src));
+      updateScanInfo({stage:'校验成功',confirm:'通过',reason:'OCR准快锁定：'+(hit.engines||hit.src),force:true});
       pulse();
       if(hit.num!==recordingNo && work.lastSuccessSpoken!==hit.num){speak('success');work.lastSuccessSpoken=hit.num}
       await handleWaybill(hit.num);
     }else{
       const srcs=[...new Set(items.filter(x=>valid(x.num)).map(x=>x.src+':'+x.num))];
       $('detectedNo').textContent=srcs.join(' / ')||'-';
-      $('sourceText').textContent=srcs.length?'等待第二种识别方式确认':'-';
+      $('sourceText').textContent=srcs.length?'OCR候选稳定中':'-';
       work.localFail++;
-      status('继续扫描','需要两种识别方式识别到同一13位单号');
-      updateScanInfo({confirm:'未通过',reason:srcs.length?'已有候选，等待另一种方式同号确认':'未扫到有效13位单号'});
-      if(work.localFail>=4){speak('fail'); work.localFail=0}
+      const stableText=lastOcrCandidate?('候选 '+lastOcrCandidate+'，正在快速复核'):(isRecording?'录制中低频扫描下一单':'请让单号区域更清晰');
+      status(isRecording?'录制中':'OCR扫描中', stableText);
+      updateScanInfo({confirm:'未通过',reason:srcs.length?stableText:'未识别到有效13位单号'});
+      if(!isRecording && work.localFail>=10){speak('fail'); work.localFail=0}
     }
   }catch(e){log('扫描出错：'+e.message,'bad')}
   finally{work.busy=false}
 }
+function scheduleNextScan(delay){
+  if(scanLoopTimer) clearTimeout(scanLoopTimer);
+  if(!work.active) return;
+  scanLoopTimer=setTimeout(async()=>{
+    await scanLoop(false);
+    scheduleNextScan(isRecording?RECORDING_SCAN_DELAY:FAST_SCAN_DELAY);
+  }, delay);
+}
+
 async function handleWaybill(no){no=norm(no); if(!valid(no))return; if(!isRecording){startRecording(no);return} if(no===recordingNo)return; await finishRecording('检测到新面单，自动保存上一单'); startRecording(no)}
-function startRecording(no){if(!work.stream)return;updateScanInfo({stage:'开始录制',confirm:'通过',reason:'正在录制单号 '+no});chunks=[];recStart=Date.now();recordingNo=no;const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm;codecs=vp8')?'video/webm;codecs=vp8':'video/webm';mediaRecorder=new MediaRecorder(work.stream,{mimeType:mime,videoBitsPerSecond:2500000});mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};mediaRecorder.onstart=()=>{isRecording=true;updateScanEffect();$('currentNo').textContent=no;$('btnFinish').disabled=false;$('recPill').textContent='录制中 '+no;status('开始录制',no);log('开始录制：'+no,'ok');speak('start')};mediaRecorder.start(1000)}
-async function finishRecording(reason='手动完成'){if(!isRecording||!mediaRecorder)return;return new Promise(res=>{const no=recordingNo,st=recStart,ed=Date.now();mediaRecorder.onstop=async()=>{const blob=new Blob(chunks,{type:mediaRecorder.mimeType||'video/webm'});isRecording=false;recordingNo=null;updateScanEffect();$('currentNo').textContent='-';$('btnFinish').disabled=true;$('recPill').textContent='未录制';if(blob.size)await saveRecord(no,blob,st,ed,reason);chunks=[];res()};try{mediaRecorder.stop()}catch(e){res()}})}
+function startRecording(no){
+  if(!work.stream)return;
+  updateScanInfo({stage:'开始录制',confirm:'通过',reason:'正在录制单号 '+no,force:true});
+  chunks=[];recStart=Date.now();recordingNo=no;
+  const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp8')?'video/webm;codecs=vp8':'video/webm';
+  mediaRecorder=new MediaRecorder(work.stream,{mimeType:mime,videoBitsPerSecond:qualityProfile().bitrate});
+  mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  mediaRecorder.onerror=e=>{log('录制器异常：'+(e.error&&e.error.message||'unknown'),'bad')};
+  mediaRecorder.onstart=()=>{
+    isRecording=true;updateScanEffect();$('currentNo').textContent=no;$('btnFinish').disabled=false;$('recPill').textContent='录制中 '+no;
+    status('开始录制',no);log('开始录制：'+no,'ok');speak('start');
+    if(scanLoopTimer) { clearTimeout(scanLoopTimer); scheduleNextScan(RECORDING_SCAN_DELAY); }
+    if(recordingGuardTimer) clearTimeout(recordingGuardTimer);
+    recordingGuardTimer=setTimeout(async()=>{
+      if(isRecording && recordingNo===no){
+        log('当前录制超过8分钟，自动分段保存并续录：'+no,'warn');
+        await finishRecording('超时自动分段保存');
+        if(work.active) startRecording(no);
+      }
+    },MAX_RECORD_MS);
+  };
+  mediaRecorder.start(5000);
+}
+async function finishRecording(reason='手动完成'){if(!isRecording||!mediaRecorder)return;return new Promise(res=>{const no=recordingNo,st=recStart,ed=Date.now();mediaRecorder.onstop=async()=>{if(recordingGuardTimer) clearTimeout(recordingGuardTimer); recordingGuardTimer=null; const blob=new Blob(chunks,{type:mediaRecorder.mimeType||'video/webm'});isRecording=false;recordingNo=null;updateScanEffect();$('currentNo').textContent='-';$('btnFinish').disabled=true;$('recPill').textContent='未录制';if(blob.size)await saveRecord(no,blob,st,ed,reason);chunks=[]; if(work.active){ if(scanLoopTimer) clearTimeout(scanLoopTimer); scheduleNextScan(FAST_SCAN_DELAY); } res()};try{mediaRecorder.stop()}catch(e){res()}})}
 function setupScanner(){
   let buf='',last=0;
   document.addEventListener('keydown',async e=>{
@@ -666,11 +899,17 @@ $('btnPanel').onclick=()=>side.classList.toggle('open');
 $('btnSaveCfg').onclick=saveCfg;
 $('btnSearch').onclick=renderResults;
 $('btnManual').onclick=()=>{const n=norm($('manualNo').value);if(!valid(n))return alert('单号格式不对');if(!work.active)return alert('请先点开始工作');handleWaybill(n)};
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){ if(scanLoopTimer) clearTimeout(scanLoopTimer); scanLoopTimer=null; log('页面进入后台，暂停识别以保护录像性能','warn'); }
+  else if(work.active){ log('页面恢复前台，继续识别','ok'); scheduleNextScan(isRecording?RECORDING_SCAN_DELAY:FAST_SCAN_DELAY); }
+});
+
 setupAuthUI();
 setupScanner();
 refreshScannerButton();
 updateScanEffect();
-log('V27已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
+log('V32已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
 </script>
 </body>
 </html>
