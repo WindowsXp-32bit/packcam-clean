@@ -137,7 +137,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
   </section>
   <aside class="side" id="side">
     <h1>V27 登录按钮修复版</h1>
-    <div class="sub">准快平衡：顶部高可信区域2次同号可快速锁定；侧边/边缘候选需更多确认，尽量做到又准又快。</div>
+    <div class="sub">最新录制：同一单号重复录制时，只保留最新视频，自动删除之前旧视频，避免查询混乱。</div>
 
     <div class="card">
       <div class="kv"><div class="k">账号</div><div class="v" id="accountName">未登录</div></div>
@@ -406,8 +406,68 @@ function loadCfg(){
 loadCfg();
 
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open('packcam_ai_v17',1);r.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('records')){const s=db.createObjectStore('records',{keyPath:'id'});s.createIndex('waybill','waybill',{unique:false});s.createIndex('createdAt','createdAt',{unique:false})}};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-async function saveRecord(no,blob,startAt,endAt,reason){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('records','readwrite');tx.objectStore('records').put({id:Date.now()+'_'+no,waybill:no,blob,startAt,endAt,reason,operator:$('operator').value||'',createdAt:new Date().toISOString(),durationMs:endAt-startAt});tx.oncomplete=()=>{savedCount++;$('savedCount').textContent=savedCount;speak('complete');log('本单录制完成：'+no,'ok');res()};tx.onerror=()=>rej(tx.error)})}
-async function query(no){no=norm(no);const db=await openDB();return new Promise((res,rej)=>{const out=[];const idx=db.transaction('records').objectStore('records').index('waybill');idx.openCursor(IDBKeyRange.only(no)).onsuccess=e=>{const c=e.target.result;if(c){out.push(c.value);c.continue()}else res(out.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)))};idx.onerror=()=>rej(idx.error)})}
+async function saveRecord(no,blob,startAt,endAt,reason){
+  const db=await openDB();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction('records','readwrite');
+    const store=tx.objectStore('records');
+    const idx=store.index('waybill');
+    const record={
+      id:Date.now()+'_'+no,
+      waybill:no,
+      blob,
+      startAt,
+      endAt,
+      reason,
+      operator:$('operator').value||'',
+      createdAt:new Date().toISOString(),
+      durationMs:endAt-startAt
+    };
+    let deleted=0, done=false;
+    const putLatest=()=>{
+      if(done) return;
+      done=true;
+      store.put(record);
+    };
+    const req=idx.openCursor(IDBKeyRange.only(no));
+    req.onsuccess=e=>{
+      const c=e.target.result;
+      if(c){
+        store.delete(c.primaryKey);
+        deleted++;
+        c.continue();
+      }else{
+        putLatest();
+      }
+    };
+    req.onerror=()=>{ putLatest(); };
+    tx.oncomplete=()=>{
+      savedCount++;
+      $('savedCount').textContent=savedCount;
+      speak('complete');
+      log((deleted>0?'已替换旧录制，保留最新：':'本单录制完成：')+no,'ok');
+      res();
+    };
+    tx.onerror=()=>rej(tx.error);
+  });
+}
+async function query(no){
+  no=norm(no);
+  const db=await openDB();
+  return new Promise((res,rej)=>{
+    const out=[];
+    const idx=db.transaction('records').objectStore('records').index('waybill');
+    idx.openCursor(IDBKeyRange.only(no)).onsuccess=e=>{
+      const c=e.target.result;
+      if(c){out.push(c.value);c.continue()}
+      else{
+        const sorted=out.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+        res(sorted.slice(0,1));
+      }
+    };
+    idx.onerror=()=>rej(idx.error);
+  });
+}
 async function renderResults(){
   resultUrls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(e){}});
   resultUrls=[];
@@ -909,7 +969,7 @@ setupAuthUI();
 setupScanner();
 refreshScannerButton();
 updateScanEffect();
-log('V32已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
+log('V33已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
 </script>
 </body>
 </html>
