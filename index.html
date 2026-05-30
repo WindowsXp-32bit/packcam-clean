@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>打包发货视频记录 V25 多引擎并行识别版</title>
+<title>打包发货视频记录 V26 SaaS项目版</title>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://unpkg.com/@zxing/browser@latest/umd/index.min.js"></script>
 <style>
@@ -28,7 +28,7 @@ body{height:var(--app-height,100dvh)}
 @keyframes scanMove{0%{top:8%;opacity:.45}45%{opacity:1}100%{top:88%;opacity:.45}}
 @media(max-width:860px){.scanBox{left:6%;right:6%;top:17%;height:44%}.scanGlow{top:calc(17% + 44% + 10px);font-size:11px}}
 
-.scanInfo{position:absolute;left:10px;right:10px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:4;display:none;pointer-events:none}
+.scanInfo{position:absolute;left:10px;right:10px;bottom:calc(112px + env(safe-area-inset-bottom));z-index:4;display:none;pointer-events:none}
 .scanInfo.active{display:block}
 .scanInfoInner{max-width:760px;margin:0 auto;background:rgba(2,6,23,.68);border:1px solid rgba(134,239,172,.28);border-radius:16px;padding:8px 10px;backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.28);font-size:11px;line-height:1.45;color:#dbeafe}
 .scanInfoGrid{display:grid;grid-template-columns:72px minmax(0,1fr);gap:3px 7px}
@@ -39,8 +39,8 @@ body{height:var(--app-height,100dvh)}
 .status{max-width:76%;padding:8px 10px;border-radius:14px;background:rgba(2,6,23,.58);backdrop-filter:blur(8px);border:1px solid var(--line);font-size:13px;line-height:1.35}
 .status b{color:#fff}.status .muted{color:var(--muted)}
 .pill{padding:8px 10px;border-radius:999px;background:rgba(2,6,23,.65);border:1px solid var(--line);font-size:12px;white-space:nowrap}
-.controls{position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;display:flex;gap:8px;align-items:center;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;overscroll-behavior-x:contain;pointer-events:auto}
-button{border:0;border-radius:999px;padding:11px 14px;color:#fff;font-size:14px;font-weight:800;background:rgba(30,41,59,.86);backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,.25)}
+.controls{position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;align-items:center;pointer-events:auto}
+button{border:0;border-radius:999px;padding:11px 10px;color:#fff;font-size:13px;font-weight:800;background:rgba(30,41,59,.88);backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,.25);touch-action:manipulation;user-select:none}
 button.primary{background:linear-gradient(135deg,#0ea5e9,#2563eb)}button.ok{background:linear-gradient(135deg,#16a34a,#22c55e)}button.warn{background:rgba(161,98,7,.92)}button.bad{background:rgba(185,28,28,.92)}button.small{font-size:12px;padding:9px 11px}button:disabled{opacity:.42}
 .side{height:var(--app-height,100dvh);overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#0b1220;border-left:1px solid var(--line);padding:14px}
 h1{font-size:18px;margin:0 0 8px}.sub{font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:12px}
@@ -55,15 +55,53 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
   .videoStage{height:var(--app-height,100dvh);min-height:0;overflow:hidden}
   .side{position:fixed;right:8px;top:calc(64px + env(safe-area-inset-top));bottom:calc(86px + env(safe-area-inset-bottom));width:min(92vw,360px);height:auto;z-index:6;border:1px solid var(--line);border-radius:18px;background:rgba(11,18,32,.94);backdrop-filter:blur(12px);transform:translateX(calc(100% + 20px));transition:.22s;max-height:calc(var(--app-height,100dvh) - 150px)}
   .side.open{transform:translateX(0)}
-  .controls{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));justify-content:flex-start;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;padding:4px 0;max-width:calc(100vw - 16px);scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x}
+  .controls{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:0;max-width:calc(100vw - 16px)}
   .controls::-webkit-scrollbar{display:none}
-  .controls button{flex:0 0 auto;padding:10px 12px;font-size:12px}
+  .controls button{min-width:0;padding:10px 6px;font-size:11px;white-space:nowrap}
   .status{font-size:12px;max-width:72%;padding:7px 9px}.pill{font-size:11px;padding:7px 8px}
-  .scanInfo{left:8px;right:8px;bottom:calc(68px + env(safe-area-inset-bottom))}.scanInfoInner{font-size:10.5px;padding:7px 9px;border-radius:14px}.scanInfoGrid{grid-template-columns:62px minmax(0,1fr)}
+  .scanInfo{left:8px;right:8px;bottom:calc(108px + env(safe-area-inset-bottom))}.scanInfoInner{font-size:10.5px;padding:7px 9px;border-radius:14px}.scanInfoGrid{grid-template-columns:62px minmax(0,1fr)}
 }
+
+.authOverlay{position:fixed;inset:0;z-index:80;background:linear-gradient(180deg,#020617,#0b1220);display:flex;align-items:center;justify-content:center;padding:18px;color:var(--txt)}
+.authOverlay.hidden{display:none}
+.authCard{width:min(94vw,430px);background:rgba(15,23,42,.94);border:1px solid rgba(148,163,184,.28);border-radius:24px;padding:18px;box-shadow:0 24px 80px rgba(0,0,0,.42)}
+.authCard h2{margin:0 0 6px;font-size:22px}.authCard p{margin:0 0 14px;color:#a8b5cc;font-size:13px;line-height:1.6}
+.authTabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.authTabs button{border-radius:14px;background:#1e293b}.authTabs button.active{background:linear-gradient(135deg,#0ea5e9,#2563eb)}
+.authMsg{font-size:12px;min-height:18px;margin-top:8px;color:#fde68a;line-height:1.5}
+.payBox{display:none;margin-top:10px;padding:10px;border-radius:14px;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.10);font-size:12px;line-height:1.6;color:#fde68a}
+.payBox.show{display:block}
+.adminTable{font-size:12px;line-height:1.45;max-height:210px;overflow:auto;border:1px solid #1e293b;border-radius:12px;margin-top:8px}
+.adminRow{display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px;border-bottom:1px solid rgba(255,255,255,.06)}
+.adminRow:last-child{border-bottom:0}
+.adminRow b{display:block;color:#e5efff}.adminRow span{color:#94a3b8}
+
 </style>
 </head>
 <body>
+
+<div class="authOverlay" id="authOverlay">
+  <div class="authCard">
+    <h2>包证录 PackCam</h2>
+    <p>打包发货视频取证系统：注册后免费试用 1 天，试用结束后需开通会员 30 元/月。</p>
+    <label>后端接口地址</label>
+    <input id="authApiBase" placeholder="例如：https://packcam-ai.xxx.workers.dev"/>
+    <div class="authTabs">
+      <button id="tabLogin" class="active">登录</button>
+      <button id="tabRegister">注册试用</button>
+    </div>
+    <label>手机号/账号</label>
+    <input id="authPhone" inputmode="numeric" placeholder="请输入手机号或账号"/>
+    <label>密码</label>
+    <input id="authPassword" type="password" placeholder="请输入密码"/>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+      <button id="btnAuthSubmit" class="primary">登录</button>
+      <button id="btnAuthDemo">本机离线试用</button>
+    </div>
+    <div class="payBox" id="payBox">试用结束后开通会员：30 元/月。当前版本先支持后台手动开通，后续可接微信/支付宝支付。</div>
+    <div class="authMsg" id="authMsg">首次使用请先填写 Cloudflare Worker 后端地址。</div>
+  </div>
+</div>
+
 <div class="app">
   <section class="videoStage">
     <video id="video" autoplay playsinline muted></video>
@@ -98,8 +136,28 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
     </div>
   </section>
   <aside class="side" id="side">
-    <h1>V25 多引擎并行识别版</h1>
-    <div class="sub">真条码扫描框 + 实体扫码枪 + 本地OCR + AI视觉兜底。下方实时显示条码/OCR/AI候选，方便判断是否扫到信息。</div>
+    <h1>V26 SaaS项目版</h1>
+    <div class="sub">多引擎并行识别：条码、OCR、AI 同时候选；两种识别方式得到同一13位单号才自动录制。扫码枪/键盘仍直接触发。</div>
+
+    <div class="card">
+      <div class="kv"><div class="k">账号</div><div class="v" id="accountName">未登录</div></div>
+      <div class="kv"><div class="k">会员状态</div><div class="v" id="memberState">-</div></div>
+      <div class="row">
+        <button id="btnRefreshAccount" class="small">刷新账号</button>
+        <button id="btnLogout" class="bad small">退出登录</button>
+      </div>
+      <div class="hint">正式版逻辑：新用户注册后免费试用 1 天；到期后需开通会员 30 元/月。当前先支持后台手动开通，支付接口后续接入。</div>
+    </div>
+    <div class="card">
+      <label>后台管理 Admin Key</label>
+      <input id="adminKey" type="password" placeholder="Cloudflare Secret 里的 ADMIN_KEY"/>
+      <div class="row">
+        <button id="btnAdminList" class="small">查看用户</button>
+        <button id="btnAdminGrant" class="ok small">给当前账号开通30天</button>
+      </div>
+      <div class="adminTable" id="adminUsers"></div>
+    </div>
+
     <div class="card">
       <div class="kv"><div class="k">工作状态</div><div class="v" id="workState">未开始</div></div>
       <div class="kv"><div class="k">识别单号</div><div class="v" id="detectedNo">-</div></div>
@@ -122,7 +180,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
       </div>
       <label>员工/打包台备注</label>
       <input id="operator" placeholder="例如：1号打包台"/>
-      <div class="hint">V25多引擎并行识别：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
+      <div class="hint">V26正式项目雏形：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
     </div>
     <div class="card">
       <label>手动/扫码枪单号</label>
@@ -204,6 +262,110 @@ function valid(n){
 function speak(key){ if(!work.active && key!=='test') return; const a= audio[key]||audio.success; try{a.pause();a.currentTime=0;a.play().catch(()=>{}); if(navigator.vibrate) navigator.vibrate(key==='fail'?[120,60,120]:[80]);}catch(e){} }
 function testVoice(){ audio.success.play().catch(()=>{}); setTimeout(()=>audio.start.play().catch(()=>{}),500); setTimeout(()=>audio.complete.play().catch(()=>{}),1050); }
 function saveCfg(){ localStorage.setItem('packcam_ai_endpoint',$('aiEndpoint').value.trim()); localStorage.setItem('packcam_ai_mode',$('aiMode').value); log('设置已保存','ok') }
+
+let currentUser=null;
+let authMode='login';
+function apiBase(){
+  const v=($('authApiBase')&&$('authApiBase').value.trim()) || localStorage.getItem('packcam_api_base') || '';
+  return v.replace(/\/+$/,'');
+}
+function authToken(){ return localStorage.getItem('packcam_token')||''; }
+function authMsg(t,bad=false){ const el=$('authMsg'); if(el){el.textContent=t; el.style.color=bad?'#fca5a5':'#fde68a';} }
+function showAuth(){ $('authOverlay').classList.remove('hidden'); }
+function hideAuth(){ $('authOverlay').classList.add('hidden'); }
+function activeUntil(user){
+  if(!user) return 0;
+  return Math.max(Number(user.trialEnds||0), Number(user.memberUntil||0));
+}
+function isAccountActive(user=currentUser){ return user && activeUntil(user)>Date.now() && !user.disabled; }
+function fmtTime(ms){ if(!ms) return '-'; return new Date(ms).toLocaleString('zh-CN',{hour12:false}); }
+function updateAccountUI(){
+  $('accountName').textContent=currentUser?currentUser.phone:'未登录';
+  if(!currentUser){ $('memberState').textContent='未登录'; return; }
+  const until=activeUntil(currentUser);
+  const type = Number(currentUser.memberUntil||0)>Date.now() ? '会员有效' : (Number(currentUser.trialEnds||0)>Date.now() ? '试用中' : '已到期');
+  $('memberState').textContent= type+'｜到期 '+fmtTime(until);
+  $('payBox')?.classList.toggle('show', !isAccountActive(currentUser));
+}
+async function api(path, body=null, extra={}){
+  const base=apiBase();
+  if(!base) throw new Error('请先填写后端接口地址');
+  const headers={'content-type':'application/json'};
+  const tk=authToken(); if(tk) headers.authorization='Bearer '+tk;
+  const r=await fetch(base+path,{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,...extra});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok || j.ok===false) throw new Error(j.error||r.statusText||'请求失败');
+  return j;
+}
+async function submitAuth(){
+  try{
+    const base=apiBase(); if(!base) return authMsg('请先填写 Cloudflare Worker 后端地址',true);
+    localStorage.setItem('packcam_api_base',base);
+    const phone=$('authPhone').value.trim(), password=$('authPassword').value;
+    if(!phone||!password) return authMsg('请输入账号和密码',true);
+    const j=await api(authMode==='login'?'/api/login':'/api/register',{phone,password});
+    localStorage.setItem('packcam_token',j.token);
+    currentUser=j.user;
+    $('aiEndpoint').value=base+'/ai-waybill';
+    localStorage.setItem('packcam_ai_endpoint',base+'/ai-waybill');
+    updateAccountUI(); hideAuth();
+    log((authMode==='login'?'登录成功':'注册成功，试用1天')+'：'+phone,'ok');
+  }catch(e){ authMsg(e.message,true); }
+}
+async function refreshAccount(){
+  try{
+    const j=await api('/api/me');
+    currentUser=j.user; updateAccountUI();
+    if($('authOverlay') && currentUser) hideAuth();
+    return currentUser;
+  }catch(e){
+    currentUser=null; updateAccountUI(); showAuth(); authMsg('请登录：'+e.message,true); return null;
+  }
+}
+async function ensureAccountActive(){
+  if(localStorage.getItem('packcam_offline_demo')==='1') return true;
+  if(!currentUser) await refreshAccount();
+  if(!currentUser){ showAuth(); return false; }
+  if(!isAccountActive(currentUser)){
+    updateAccountUI(); showAuth(); authMsg('试用/会员已到期，需要开通会员 30元/月',true); return false;
+  }
+  return true;
+}
+async function adminList(){
+  try{
+    const key=$('adminKey').value.trim(); if(!key) return alert('请输入 Admin Key');
+    const j=await api('/api/admin/list',{adminKey:key});
+    const box=$('adminUsers'); box.innerHTML='';
+    (j.users||[]).forEach(u=>{
+      const div=document.createElement('div'); div.className='adminRow';
+      div.innerHTML='<div><b>'+u.phone+'</b><span>试用到：'+fmtTime(u.trialEnds)+'<br>会员到：'+fmtTime(u.memberUntil)+'</span></div><button class="small" data-phone="'+u.phone+'">开30天</button>';
+      div.querySelector('button').onclick=()=>adminGrant(u.phone);
+      box.appendChild(div);
+    });
+  }catch(e){alert(e.message)}
+}
+async function adminGrant(phone){
+  try{
+    const key=$('adminKey').value.trim(); if(!key) return alert('请输入 Admin Key');
+    phone=phone||($('authPhone').value.trim() || (currentUser&&currentUser.phone));
+    if(!phone) return alert('没有账号');
+    await api('/api/admin/grant',{adminKey:key,phone,days:30});
+    alert('已开通30天：'+phone); await refreshAccount(); await adminList();
+  }catch(e){alert(e.message)}
+}
+function setupAuthUI(){
+  $('authApiBase').value=localStorage.getItem('packcam_api_base') || '';
+  $('tabLogin').onclick=()=>{authMode='login';$('tabLogin').classList.add('active');$('tabRegister').classList.remove('active');$('btnAuthSubmit').textContent='登录';};
+  $('tabRegister').onclick=()=>{authMode='register';$('tabRegister').classList.add('active');$('tabLogin').classList.remove('active');$('btnAuthSubmit').textContent='注册并试用1天';};
+  $('btnAuthSubmit').onclick=submitAuth;
+  $('btnAuthDemo').onclick=()=>{localStorage.setItem('packcam_offline_demo','1'); currentUser={phone:'本机离线试用',trialEnds:Date.now()+86400000,memberUntil:0}; updateAccountUI(); hideAuth(); log('已进入本机离线试用：仅测试摄像头和本地录像，不含云端会员校验。','warn');};
+  $('btnRefreshAccount').onclick=refreshAccount;
+  $('btnLogout').onclick=()=>{localStorage.removeItem('packcam_token');localStorage.removeItem('packcam_offline_demo');currentUser=null;updateAccountUI();showAuth();};
+  $('btnAdminList').onclick=adminList;
+  $('btnAdminGrant').onclick=()=>adminGrant();
+  if(authToken() && apiBase()) refreshAccount(); else showAuth();
+}
+
 function loadCfg(){ $('aiEndpoint').value=localStorage.getItem('packcam_ai_endpoint')||''; $('aiMode').value=localStorage.getItem('packcam_ai_mode')||'on'; }
 loadCfg();
 
@@ -222,6 +384,7 @@ async function startCamera(){
 }
 function stopCamera(){ if(work.stream){work.stream.getTracks().forEach(t=>t.stop());work.stream=null;work.track=null;video.srcObject=null} }
 async function startWork(){
+  if(!(await ensureAccountActive())) return;
   await startCamera();
   work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0; work.loopCount=0;
   $('btnStart').disabled=true;$('btnStop').disabled=false;$('btnScan').disabled=false;$('btnFinish').disabled=!isRecording;
@@ -418,7 +581,7 @@ async function callAIasync function callAI(zones){
   const imgs=zones.slice(0,5).map(z=>({name:z.name,dataUrl:preprocess(z.canvas).toDataURL('image/jpeg',.86)}));
   status('AI兜底识别中','只上传面单号小区域，不上传整张面单。'); updateScanInfo({stage:'AI识别',ai:'请求中',reason:'本地未通过，正在请求AI兜底'});
   try{
-    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs,hint:'中国邮政/EMS面单。第一张通常是绿色扫码框区域，后面是顶部条码下方数字、右侧竖向条码旁数字、边缘竖排数字。严格只接受13位纯数字运单号，不限制首位。请尽量返回看到的13位纯数字运单号候选；前端会用条码/OCR/AI多引擎交叉验证，两种方式同号才自动录制。不要把手机号、路由码、日期、数量、重量当成单号。'})});
+    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',...(authToken()?{authorization:'Bearer '+authToken()}:{})},body:JSON.stringify({images:imgs,hint:'中国邮政/EMS面单。第一张通常是绿色扫码框区域，后面是顶部条码下方数字、右侧竖向条码旁数字、边缘竖排数字。严格只接受13位纯数字运单号，不限制首位。请尽量返回看到的13位纯数字运单号候选；前端会用条码/OCR/AI多引擎交叉验证，两种方式同号才自动录制。不要把手机号、路由码、日期、数量、重量当成单号。'})});
     const j=await r.json(); if(!r.ok) throw new Error(j.error||r.statusText);
     const arr=[];
     if(j.confirmed && valid(j.waybill)) arr.push({num:j.waybill,src:'AI确认:'+((j.regions||[]).join('+')||'两处一致')});
@@ -503,10 +666,11 @@ $('btnPanel').onclick=()=>side.classList.toggle('open');
 $('btnSaveCfg').onclick=saveCfg;
 $('btnSearch').onclick=renderResults;
 $('btnManual').onclick=()=>{const n=norm($('manualNo').value);if(!valid(n))return alert('单号格式不对');if(!work.active)return alert('请先点开始工作');handleWaybill(n)};
+setupAuthUI();
 setupScanner();
 refreshScannerButton();
 updateScanEffect();
-log('V25已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
+log('V26已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
 </script>
 </body>
 </html>
