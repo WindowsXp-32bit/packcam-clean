@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>打包发货视频记录 V21 扫码动效版</title>
+<title>打包发货视频记录 V22 专门扫码模式版</title>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#07101f;--panel:rgba(12,18,32,.86);--line:rgba(255,255,255,.15);--txt:#f1f5ff;--muted:#a8b5cc;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--blue:#3b82f6}
@@ -16,14 +16,14 @@
 
 .scanEffect{position:absolute;inset:0;z-index:2;pointer-events:none;display:none}
 .scanEffect.active{display:block}
-.scanBox{position:absolute;left:8%;right:8%;top:22%;height:36%;border:2px solid rgba(34,197,94,.78);border-radius:20px;box-shadow:0 0 0 9999px rgba(0,0,0,.08),0 0 24px rgba(34,197,94,.22) inset}
+.scanBox{position:absolute;left:7%;right:7%;top:18%;height:42%;border:2px solid rgba(34,197,94,.78);border-radius:20px;box-shadow:0 0 0 9999px rgba(0,0,0,.08),0 0 24px rgba(34,197,94,.22) inset}
 .scanBox:before,.scanBox:after{content:"";position:absolute;width:28px;height:28px;border-color:#86efac;border-style:solid}
 .scanBox:before{left:-3px;top:-3px;border-width:4px 0 0 4px;border-radius:18px 0 0 0}
 .scanBox:after{right:-3px;bottom:-3px;border-width:0 4px 4px 0;border-radius:0 0 18px 0}
 .scanLine{position:absolute;left:5%;right:5%;height:3px;top:8%;border-radius:999px;background:linear-gradient(90deg,transparent,#bbf7d0,#22c55e,#bbf7d0,transparent);box-shadow:0 0 18px rgba(34,197,94,.9);animation:scanMove 1.05s linear infinite}
-.scanGlow{position:absolute;left:12%;right:12%;top:calc(22% + 36% + 12px);text-align:center;color:#dcfce7;background:rgba(2,6,23,.58);border:1px solid rgba(134,239,172,.38);border-radius:999px;padding:7px 10px;font-size:12px;backdrop-filter:blur(8px)}
+.scanGlow{position:absolute;left:10%;right:10%;top:calc(18% + 42% + 12px);text-align:center;color:#dcfce7;background:rgba(2,6,23,.58);border:1px solid rgba(134,239,172,.38);border-radius:999px;padding:7px 10px;font-size:12px;backdrop-filter:blur(8px)}
 @keyframes scanMove{0%{top:8%;opacity:.45}45%{opacity:1}100%{top:88%;opacity:.45}}
-@media(max-width:860px){.scanBox{left:7%;right:7%;top:20%;height:38%}.scanGlow{top:calc(20% + 38% + 10px);font-size:11px}}
+@media(max-width:860px){.scanBox{left:6%;right:6%;top:17%;height:44%}.scanGlow{top:calc(17% + 44% + 10px);font-size:11px}}
 
 .topbar{position:absolute;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));display:flex;gap:8px;align-items:center;justify-content:space-between;z-index:3;pointer-events:none}
 .status{max-width:76%;padding:8px 10px;border-radius:14px;background:rgba(2,6,23,.58);backdrop-filter:blur(8px);border:1px solid var(--line);font-size:13px;line-height:1.35}
@@ -48,14 +48,14 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
   <section class="videoStage">
     <video id="video" autoplay playsinline muted></video>
     <div id="flash"></div>
-    <div id="scanEffect" class="scanEffect"><div class="scanBox"><div class="scanLine"></div></div><div class="scanGlow">手机扫码枪扫描中｜对准面单顶部或右侧条码</div></div>
+    <div id="scanEffect" class="scanEffect"><div class="scanBox"><div class="scanLine"></div></div><div class="scanGlow">专门扫码中｜把顶部条码/单号或右侧条码/单号放进框内</div></div>
     <div class="topbar">
-      <div class="status" id="statusBox"><b>未开始</b><br><span class="muted">点“开始工作”后才会打开摄像头；手机扫码枪会优先扫条码，扫不到再OCR/AI。</span></div>
+      <div class="status" id="statusBox"><b>未开始</b><br><span class="muted">点“开始工作”后才会打开摄像头；专门扫码框优先扫条码；扫不到再OCR/AI。</span></div>
       <div class="pill" id="recPill">未录制</div>
     </div>
     <div class="controls">
       <button id="btnStart" class="primary">开始工作</button>
-      <button id="btnScannerMode" class="small">手机扫码枪：开</button>
+      <button id="btnScannerMode" class="small">专门扫码：开</button>
       <button id="btnScan" class="small" disabled>补扫</button>
       <button id="btnFinish" class="warn small" disabled>完成本单</button>
       <button id="btnStop" class="bad small" disabled>停止</button>
@@ -65,8 +65,8 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
     </div>
   </section>
   <aside class="side" id="side">
-    <h1>V21 扫码动效版</h1>
-    <div class="sub">扫码枪 + 条码 + 本地OCR + AI视觉兜底。严格校验：两处单号一致才自动开始，避免错录。</div>
+    <h1>V22 专门扫码模式版</h1>
+    <div class="sub">专门扫码框 + 实体扫码枪 + 条码 + 本地OCR + AI视觉兜底。条码直通，文字/AI必须满足两处一致才自动开始。</div>
     <div class="card">
       <div class="kv"><div class="k">工作状态</div><div class="v" id="workState">未开始</div></div>
       <div class="kv"><div class="k">识别单号</div><div class="v" id="detectedNo">-</div></div>
@@ -89,7 +89,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
       </div>
       <label>员工/打包台备注</label>
       <input id="operator" placeholder="例如：1号打包台"/>
-      <div class="hint">V21新增“手机扫码枪扫描动效”：手机扫码枪开启并开始工作后，会显示绿色扫描线和扫码框；识别成功会闪一下。V20新增“手机扫码枪模式”：手机摄像头会优先扫面单顶部/右侧条码，扫到13位单号就像扫码枪一样自动开始/切换；扫不到再走OCR和AI兜底。</div>
+      <div class="hint">V22新增“专门扫码模式”：开始工作后，先把顶部条码/单号或右侧条码/单号对准绿色扫码框。系统优先扫扫码框里的条码，扫不到就裁剪扫码框、顶部数字区、右侧数字区走OCR/AI。满足13位单号且两处一致，或条码直接识别成功，才开始/切换录制。</div>
     </div>
     <div class="card">
       <label>手动/扫码枪单号</label>
@@ -156,8 +156,8 @@ async function startWork(){
   await startCamera();
   work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0; work.loopCount=0;
   $('btnStart').disabled=true;$('btnStop').disabled=false;$('btnScan').disabled=false;$('btnFinish').disabled=!isRecording;
-  status('工作中',work.phoneScanner?'手机扫码枪优先扫条码；扫不到再OCR/AI。':'自动识别面单号；本地失败会调用AI兜底。');
-  log('开始工作：摄像头已打开，自动流水已启动','ok');
+  status('工作中',work.phoneScanner?'专门扫码框优先扫条码；扫不到再OCR/AI。':'自动识别面单号；本地失败会调用AI兜底。');
+  log('开始工作：摄像头已打开，专门扫码模式已启动','ok');
   updateScanEffect();
   if(work.scanTimer) clearInterval(work.scanTimer);
   work.scanTimer=setInterval(scanLoop,480);
@@ -174,6 +174,11 @@ async function switchCam(){
   const was=work.active; if(work.stream) stopCamera(); if(was){await startCamera(); log('已切换摄像头：'+(work.facing==='user'?'前置':'后置'),'ok')}
 }
 function capture(maxW=1280){if(!video.videoWidth)return null;const vw=video.videoWidth,vh=video.videoHeight;const scale=Math.min(1,maxW/vw);frame.width=Math.round(vw*scale);frame.height=Math.round(vh*scale);fctx.drawImage(video,0,0,frame.width,frame.height);return {canvas:frame,w:frame.width,h:frame.height}}
+function scanBoxRegion(src){
+  // 对应画面上的绿色专门扫码框。网页端无法像原生APK一样读取精确取景器映射，
+  // 这里用同比例裁剪：优先让员工把条码/单号放进框内，提高识别速度和成功率。
+  return {x:src.w*0.06,y:src.h*0.17,w:src.w*0.88,h:src.h*0.44};
+}
 function crop(src,b){const c=document.createElement('canvas');const x=Math.max(0,Math.round(b.x)),y=Math.max(0,Math.round(b.y));const w=Math.min(src.w-x,Math.round(b.w)),h=Math.min(src.h-y,Math.round(b.h));c.width=Math.max(1,w);c.height=Math.max(1,h);c.getContext('2d').drawImage(src.canvas,x,y,w,h,0,0,w,h);return c}
 function findLabel(src){
   const w=src.w,h=src.h, img=fctx.getImageData(0,0,w,h).data; let minX=w,minY=h,maxX=0,maxY=0,count=0;
@@ -205,11 +210,8 @@ async function phoneScannerScan(src,zones){
   if(!work.phoneScanner || !barcodeDetector) return [];
   const now=Date.now();
   const out=[];
-  // 手机当扫码枪：优先扫全画面、顶部条码、右侧竖向条码；识别到条码立即返回。
-  const list=[
-    {name:'全画面',canvas:src.canvas},
-    zones[0],zones[1],zones[2],zones[3],zones[5]
-  ].filter(Boolean);
+  // 手机当扫码枪：V22先扫绿色扫码框，再扫顶部/右侧关键区；识别到条码立即返回。
+  const list=[zones[0],zones[1],zones[2],zones[3],zones[4],{name:'全画面兜底',canvas:src.canvas}].filter(Boolean);
   for(const z of list){
     for(const deg of [0,90,-90,180]){
       try{
@@ -235,7 +237,7 @@ async function phoneScannerScan(src,zones){
 function refreshScannerButton(){
   const b=$('btnScannerMode');
   if(!b) return;
-  b.textContent=work.phoneScanner?'手机扫码枪：开':'手机扫码枪：关';
+  b.textContent=work.phoneScanner?'专门扫码：开':'专门扫码：关';
   b.className=work.phoneScanner?'small primary':'small';
 }
 function updateScanEffect(){
@@ -247,7 +249,7 @@ function togglePhoneScanner(){
   localStorage.setItem('packcam_phone_scanner',work.phoneScanner?'on':'off');
   refreshScannerButton();
   updateScanEffect();
-  log(work.phoneScanner?'手机扫码枪模式已开启：优先扫条码':'手机扫码枪模式已关闭','warn');
+  log(work.phoneScanner?'专门扫码模式已开启：优先扫绿色框内条码/单号':'专门扫码模式已关闭','warn');
 }
 
 async function localBarcode(zones){
@@ -279,6 +281,7 @@ async function localOCR(zones){
 }
 function regionKey(src){
   src=String(src||'');
+  if(src.includes('扫码框')) return 'scanbox';
   if(src.includes('扫码枪')) return 'scanner';
   if(src.includes('条码')) return 'barcode';
   if(src.includes('顶部')) return 'top';
@@ -314,7 +317,7 @@ async function callAI(zones){
   const imgs=zones.slice(0,5).map(z=>({name:z.name,dataUrl:preprocess(z.canvas).toDataURL('image/jpeg',.86)}));
   status('AI兜底识别中','只上传面单号小区域，不上传整张面单。');
   try{
-    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs,hint:'中国邮政/EMS面单。严格只接受13位纯数字运单号，不限制首位。必须顶部横向条码下方数字、右侧竖向条码旁数字、边缘竖排数字中至少两处一致，才算confirmed。不要把手机号、路由码、日期、数量、重量当成单号。'})});
+    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs,hint:'中国邮政/EMS面单。第一张通常是绿色扫码框区域，后面是顶部条码下方数字、右侧竖向条码旁数字、边缘竖排数字。严格只接受13位纯数字运单号，不限制首位。必须至少两处区域识别到同一13位数字，才算confirmed。不要把手机号、路由码、日期、数量、重量当成单号。'})});
     const j=await r.json(); if(!r.ok) throw new Error(j.error||r.statusText);
     const arr=[];
     if(j.confirmed && valid(j.waybill)) arr.push({num:j.waybill,src:'AI确认:'+((j.regions||[]).join('+')||'两处一致')});
@@ -333,9 +336,10 @@ async function scanLoop(force=false){
   if(!work.active || work.busy || !work.stream) return; work.busy=true;
   try{
     const src=capture(1280); if(!src) return;
-    const box=findLabel(src); const label=crop(src,box); const zones=makeZones(label);
+    const scanZone={name:'扫码框区域',canvas:crop(src,scanBoxRegion(src))};
+    const box=findLabel(src); const label=crop(src,box); const zones=[scanZone,...makeZones(label)];
     let items=[];
-    // 第一优先级：手机摄像头当扫码枪，只扫条码，速度最快、误识别最低。
+    // 第一优先级：专门扫码框，只扫条码，速度最快、误识别最低。
     const ps=await phoneScannerScan(src,zones); items=items.concat(ps);
     let hit=consensus(items);
     if(!hit){ const b=await localBarcode(zones); items=items.concat(b); hit=consensus(items); }
@@ -349,7 +353,7 @@ async function scanLoop(force=false){
       await handleWaybill(hit.num);
     }else{
       const srcs=[...new Set(items.map(x=>x.src+':'+x.num))]; $('detectedNo').textContent=srcs.join(' / ')||'-'; $('sourceText').textContent=srcs.length?'未一致':'未识别';
-      status('识别中','请让顶部条码和右侧条码都进入画面，保持1秒。');
+      status('专门扫码中','把顶部条码/单号或右侧条码/单号放进绿色框，保持1秒。');
       if(work.localFail>=4){speak('fail'); work.localFail=0}
     }
   }catch(e){log('扫描出错：'+e.message,'bad')}
@@ -382,7 +386,7 @@ $('btnManual').onclick=()=>{const n=norm($('manualNo').value);if(!valid(n))retur
 setupScanner();
 refreshScannerButton();
 updateScanEffect();
-log('V21已加载：手机扫码枪扫码动效版。开启手机扫码枪并开始工作后，会显示绿色扫描线；识别成功会闪一下。');
+log('V22已加载：专门扫码模式版。开始工作后，对准绿色扫码框；条码扫不到会用OCR/AI兜底，但必须满足校验才开录。');
 </script>
 </body>
 </html>
