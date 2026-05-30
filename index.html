@@ -3,13 +3,16 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>打包发货视频记录 V22 专门扫码模式版</title>
+<title>打包发货视频记录 V24 真条码扫描版</title>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://unpkg.com/@zxing/browser@latest/umd/index.min.js"></script>
 <style>
 :root{--bg:#07101f;--panel:rgba(12,18,32,.86);--line:rgba(255,255,255,.15);--txt:#f1f5ff;--muted:#a8b5cc;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--blue:#3b82f6}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;height:100%;background:#020617;color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",Roboto,Arial,sans-serif;overflow:hidden}
-.app{height:100dvh;width:100vw;display:grid;grid-template-columns:minmax(0,1fr) 360px;background:var(--bg)}
-.videoStage{position:relative;height:100dvh;background:#000;overflow:hidden}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;background:#020617;color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",Roboto,Arial,sans-serif;overflow:hidden;overscroll-behavior:none;touch-action:manipulation;position:fixed;inset:0}
+body{height:var(--app-height,100dvh)}
+.app{position:fixed;inset:0;height:var(--app-height,100dvh);width:100vw;display:grid;grid-template-columns:minmax(0,1fr) 360px;background:var(--bg);overflow:hidden}
+.videoStage{position:relative;height:var(--app-height,100dvh);min-height:0;background:#000;overflow:hidden}
 #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
 #flash{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .18s;background:rgba(34,197,94,.22)}
 #flash.on{opacity:1}
@@ -25,6 +28,13 @@
 @keyframes scanMove{0%{top:8%;opacity:.45}45%{opacity:1}100%{top:88%;opacity:.45}}
 @media(max-width:860px){.scanBox{left:6%;right:6%;top:17%;height:44%}.scanGlow{top:calc(17% + 44% + 10px);font-size:11px}}
 
+.scanInfo{position:absolute;left:10px;right:10px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:4;display:none;pointer-events:none}
+.scanInfo.active{display:block}
+.scanInfoInner{max-width:760px;margin:0 auto;background:rgba(2,6,23,.68);border:1px solid rgba(134,239,172,.28);border-radius:16px;padding:8px 10px;backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.28);font-size:11px;line-height:1.45;color:#dbeafe}
+.scanInfoGrid{display:grid;grid-template-columns:72px minmax(0,1fr);gap:3px 7px}
+.scanInfoGrid b{color:#bbf7d0;font-weight:800}.scanInfoGrid span{word-break:break-all;color:#e5efff}
+.scanInfoGrid .muted{color:#93a4bd}.scanInfoGrid .warn{color:#fde68a}.scanInfoGrid .ok{color:#86efac}.scanInfoGrid .bad{color:#fca5a5}
+
 .topbar{position:absolute;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));display:flex;gap:8px;align-items:center;justify-content:space-between;z-index:3;pointer-events:none}
 .status{max-width:76%;padding:8px 10px;border-radius:14px;background:rgba(2,6,23,.58);backdrop-filter:blur(8px);border:1px solid var(--line);font-size:13px;line-height:1.35}
 .status b{color:#fff}.status .muted{color:var(--muted)}
@@ -32,7 +42,7 @@
 .controls{position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;pointer-events:auto}
 button{border:0;border-radius:999px;padding:11px 14px;color:#fff;font-size:14px;font-weight:800;background:rgba(30,41,59,.86);backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,.25)}
 button.primary{background:linear-gradient(135deg,#0ea5e9,#2563eb)}button.ok{background:linear-gradient(135deg,#16a34a,#22c55e)}button.warn{background:rgba(161,98,7,.92)}button.bad{background:rgba(185,28,28,.92)}button.small{font-size:12px;padding:9px 11px}button:disabled{opacity:.42}
-.side{height:100dvh;overflow:auto;background:#0b1220;border-left:1px solid var(--line);padding:14px}
+.side{height:var(--app-height,100dvh);overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#0b1220;border-left:1px solid var(--line);padding:14px}
 h1{font-size:18px;margin:0 0 8px}.sub{font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:12px}
 .card{background:rgba(15,23,42,.78);border:1px solid var(--line);border-radius:18px;padding:12px;margin-bottom:12px}
 .kv{display:grid;grid-template-columns:86px minmax(0,1fr);gap:8px;border-bottom:1px dashed rgba(255,255,255,.12);padding:8px 0;font-size:13px}.kv:last-child{border-bottom:0}.k{color:var(--muted)}.v{font-weight:800;word-break:break-all}
@@ -40,7 +50,17 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
 .log{height:150px;overflow:auto;background:#020617;border:1px solid #1e293b;border-radius:13px;padding:9px;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#cbd5e1}.log div{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)}
 .record{background:#020617;border:1px solid #263244;border-radius:14px;padding:10px;margin:10px 0}.record video{width:100%;border-radius:10px;max-height:280px;background:#000}.hint{font-size:12px;line-height:1.55;color:#dbeafe;background:rgba(37,99,235,.13);border:1px solid rgba(96,165,250,.25);border-radius:13px;padding:10px;margin-top:8px}
 .mini{font-size:11px;color:#94a3b8}.hidden{display:none!important}
-@media(max-width:860px){.app{display:block}.videoStage{height:100dvh}.side{position:absolute;right:8px;top:calc(64px + env(safe-area-inset-top));bottom:calc(92px + env(safe-area-inset-bottom));width:min(92vw,360px);height:auto;z-index:6;border:1px solid var(--line);border-radius:18px;background:rgba(11,18,32,.94);backdrop-filter:blur(12px);transform:translateX(calc(100% + 20px));transition:.22s}.side.open{transform:translateX(0)}.controls{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding:4px 0}.controls button{flex:0 0 auto}.status{font-size:12px;max-width:72%}.pill{font-size:11px;padding:7px 8px}}
+@media(max-width:860px){
+  .app{display:block;height:var(--app-height,100dvh);overflow:hidden}
+  .videoStage{height:var(--app-height,100dvh);min-height:0;overflow:hidden}
+  .side{position:fixed;right:8px;top:calc(64px + env(safe-area-inset-top));bottom:calc(86px + env(safe-area-inset-bottom));width:min(92vw,360px);height:auto;z-index:6;border:1px solid var(--line);border-radius:18px;background:rgba(11,18,32,.94);backdrop-filter:blur(12px);transform:translateX(calc(100% + 20px));transition:.22s;max-height:calc(var(--app-height,100dvh) - 150px)}
+  .side.open{transform:translateX(0)}
+  .controls{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding:4px 0;max-width:calc(100vw - 16px);scrollbar-width:none}
+  .controls::-webkit-scrollbar{display:none}
+  .controls button{flex:0 0 auto;padding:10px 12px;font-size:12px}
+  .status{font-size:12px;max-width:72%;padding:7px 9px}.pill{font-size:11px;padding:7px 8px}
+  .scanInfo{left:8px;right:8px;bottom:calc(68px + env(safe-area-inset-bottom))}.scanInfoInner{font-size:10.5px;padding:7px 9px;border-radius:14px}.scanInfoGrid{grid-template-columns:62px minmax(0,1fr)}
+}
 </style>
 </head>
 <body>
@@ -48,10 +68,23 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
   <section class="videoStage">
     <video id="video" autoplay playsinline muted></video>
     <div id="flash"></div>
-    <div id="scanEffect" class="scanEffect"><div class="scanBox"><div class="scanLine"></div></div><div class="scanGlow">专门扫码中｜把顶部条码/单号或右侧条码/单号放进框内</div></div>
+    <div id="scanEffect" class="scanEffect"><div class="scanBox"><div class="scanLine"></div></div><div class="scanGlow">真条码扫描中｜把顶部横向长条码放进框内</div></div>
     <div class="topbar">
       <div class="status" id="statusBox"><b>未开始</b><br><span class="muted">点“开始工作”后才会打开摄像头；专门扫码框优先扫条码；扫不到再OCR/AI。</span></div>
       <div class="pill" id="recPill">未录制</div>
+    </div>
+
+    <div class="scanInfo" id="scanInfo">
+      <div class="scanInfoInner">
+        <div class="scanInfoGrid">
+          <b>阶段</b><span id="scanStage">未开始</span>
+          <b>条码</b><span id="scanBarcode" class="muted">-</span>
+          <b>OCR</b><span id="scanOCR" class="muted">-</span>
+          <b>AI</b><span id="scanAI" class="muted">-</span>
+          <b>确认</b><span id="scanConfirm" class="muted">0/2</span>
+          <b>状态</b><span id="scanReason" class="muted">等待开始工作</span>
+        </div>
+      </div>
     </div>
     <div class="controls">
       <button id="btnStart" class="primary">开始工作</button>
@@ -65,8 +98,8 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
     </div>
   </section>
   <aside class="side" id="side">
-    <h1>V22 专门扫码模式版</h1>
-    <div class="sub">专门扫码框 + 实体扫码枪 + 条码 + 本地OCR + AI视觉兜底。条码直通，文字/AI必须满足两处一致才自动开始。</div>
+    <h1>V24 真条码扫描版</h1>
+    <div class="sub">真条码扫描框 + 实体扫码枪 + 本地OCR + AI视觉兜底。下方实时显示条码/OCR/AI候选，方便判断是否扫到信息。</div>
     <div class="card">
       <div class="kv"><div class="k">工作状态</div><div class="v" id="workState">未开始</div></div>
       <div class="kv"><div class="k">识别单号</div><div class="v" id="detectedNo">-</div></div>
@@ -89,7 +122,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
       </div>
       <label>员工/打包台备注</label>
       <input id="operator" placeholder="例如：1号打包台"/>
-      <div class="hint">V22新增“专门扫码模式”：开始工作后，先把顶部条码/单号或右侧条码/单号对准绿色扫码框。系统优先扫扫码框里的条码，扫不到就裁剪扫码框、顶部数字区、右侧数字区走OCR/AI。满足13位单号且两处一致，或条码直接识别成功，才开始/切换录制。</div>
+      <div class="hint">V24真条码扫描：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
     </div>
     <div class="card">
       <label>手动/扫码枪单号</label>
@@ -105,12 +138,29 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
   </aside>
 </div>
 <script>
+function setAppHeight(){
+  const h = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+  document.documentElement.style.setProperty('--app-height', Math.max(320, Math.round(h)) + 'px');
+}
+setAppHeight();
+window.addEventListener('resize', setAppHeight, {passive:true});
+window.addEventListener('orientationchange', ()=>setTimeout(setAppHeight,250), {passive:true});
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', setAppHeight, {passive:true});
+  window.visualViewport.addEventListener('scroll', setAppHeight, {passive:true});
+}
+// 防止手机浏览器把页面上下拖到空白；设置/查询抽屉内部仍允许滚动。
+document.addEventListener('touchmove', e=>{
+  const side = document.getElementById('side');
+  if(side && side.classList.contains('open') && side.contains(e.target)) return;
+  e.preventDefault();
+}, {passive:false});
 const $=id=>document.getElementById(id);
 const video=$('video'), side=$('side');
 const work={active:false, stream:null, track:null, facing:'environment', scanTimer:null, busy:false, aiCooldown:0, localFail:0, lastNo:'', lastNoCount:0, lastSuccessSpoken:'', phoneScanner:localStorage.getItem('packcam_phone_scanner')!=='off', lastPhoneScanNo:'', lastPhoneScanAt:0, loopCount:0};
 let mediaRecorder=null,chunks=[],recordingNo=null,isRecording=false,recStart=0,savedCount=0,voicesReady=false;
 const frame=document.createElement('canvas'), fctx=frame.getContext('2d',{willReadFrequently:true});
-let barcodeDetector=null;
+let barcodeDetector=null, zxingReader=null;
 
 const audio={
   start:new Audio('audio/start.mp3'),
@@ -122,6 +172,24 @@ Object.values(audio).forEach(a=>{a.preload='auto';a.volume=1});
 
 function log(s,type=''){const d=document.createElement('div');d.textContent='['+new Date().toLocaleTimeString('zh-CN',{hour12:false})+'] '+s;if(type==='ok')d.style.color='#86efac';if(type==='bad')d.style.color='#fca5a5';if(type==='warn')d.style.color='#fde68a';$('log').prepend(d)}
 function status(a,b=''){ $('statusBox').innerHTML='<b>'+a+'</b><br><span class="muted">'+b+'</span>'; $('workState').textContent=a+(b?' - '+b:''); }
+
+const scanInfoState={stage:'未开始',barcode:'-',ocr:'-',ai:'-',confirm:'0/2',reason:'等待开始工作'};
+function updateScanInfo(p={}){
+  Object.assign(scanInfoState,p);
+  const el=$('scanInfo'); if(el) el.classList.toggle('active', !!work.active);
+  const set=(id,val,cls='')=>{const e=$(id); if(!e) return; e.textContent=val||'-'; e.className=cls||((!val||val==='-'||val==='0/2')?'muted':'')};
+  set('scanStage',scanInfoState.stage, scanInfoState.stage.includes('成功')?'ok':'');
+  set('scanBarcode',scanInfoState.barcode, scanInfoState.barcode&&scanInfoState.barcode!=='-'?'ok':'muted');
+  set('scanOCR',scanInfoState.ocr, scanInfoState.ocr&&scanInfoState.ocr!=='-'?'warn':'muted');
+  set('scanAI',scanInfoState.ai, scanInfoState.ai&&scanInfoState.ai!=='-'?'warn':'muted');
+  set('scanConfirm',scanInfoState.confirm, String(scanInfoState.confirm).includes('通过')?'ok':'muted');
+  let cls='muted'; if(String(scanInfoState.reason).includes('开始')||String(scanInfoState.reason).includes('通过')) cls='ok'; if(String(scanInfoState.reason).includes('排除')||String(scanInfoState.reason).includes('未')) cls='warn'; if(String(scanInfoState.reason).includes('失败')||String(scanInfoState.reason).includes('错误')) cls='bad';
+  set('scanReason',scanInfoState.reason,cls);
+}
+function summarizeItems(items){
+  const s=[...new Set((items||[]).map(x=>(x.src||'未知')+':'+(x.num||'-')))];
+  return s.slice(0,4).join(' / ') || '-';
+}
 function pulse(){ $('flash').classList.add('on'); setTimeout(()=>$('flash').classList.remove('on'),220); }
 function norm(s){return String(s||'').replace(/[^\d]/g,'')}
 function valid(n){
@@ -150,6 +218,7 @@ async function startCamera(){
   video.srcObject=work.stream; work.track=work.stream.getVideoTracks()[0];
   await video.play();
   try{barcodeDetector=new BarcodeDetector({formats:['code_128','code_39','ean_13','qr_code','data_matrix']})}catch(e){barcodeDetector=null}
+  try{ if(window.ZXingBrowser&&ZXingBrowser.BrowserMultiFormatReader) zxingReader=new ZXingBrowser.BrowserMultiFormatReader(); else if(window.ZXing&&ZXing.BrowserMultiFormatReader) zxingReader=new ZXing.BrowserMultiFormatReader(); }catch(e){ zxingReader=null }
 }
 function stopCamera(){ if(work.stream){work.stream.getTracks().forEach(t=>t.stop());work.stream=null;work.track=null;video.srcObject=null} }
 async function startWork(){
@@ -157,8 +226,9 @@ async function startWork(){
   work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0; work.loopCount=0;
   $('btnStart').disabled=true;$('btnStop').disabled=false;$('btnScan').disabled=false;$('btnFinish').disabled=!isRecording;
   status('工作中',work.phoneScanner?'专门扫码框优先扫条码；扫不到再OCR/AI。':'自动识别面单号；本地失败会调用AI兜底。');
-  log('开始工作：摄像头已打开，专门扫码模式已启动','ok');
+  log('开始工作：摄像头已打开，真条码扫描框已启动','ok');
   updateScanEffect();
+  updateScanInfo({stage:'条码扫描',barcode:'-',ocr:'-',ai:'-',confirm:'0/2',reason:'请把顶部横向条码放进绿色框，保持0.5～1秒'});
   if(work.scanTimer) clearInterval(work.scanTimer);
   work.scanTimer=setInterval(scanLoop,480);
   setTimeout(scanLoop,200);
@@ -167,7 +237,7 @@ async function stopWork(){
   work.active=false; if(work.scanTimer) clearInterval(work.scanTimer); work.scanTimer=null;
   if(isRecording) await finishRecording('停止工作自动保存');
   stopCamera(); $('btnStart').disabled=false;$('btnStop').disabled=true;$('btnScan').disabled=true;$('btnFinish').disabled=true;
-  status('已停止','摄像头已关闭，自动流水已停止。'); $('recPill').textContent='未录制'; updateScanEffect(); log('已停止工作','warn');
+  status('已停止','摄像头已关闭，自动流水已停止。'); $('recPill').textContent='未录制'; updateScanEffect(); updateScanInfo({stage:'已停止',barcode:'-',ocr:'-',ai:'-',confirm:'0/2',reason:'等待开始工作'}); log('已停止工作','warn');
 }
 async function switchCam(){
   work.facing=work.facing==='environment'?'user':'environment';
@@ -204,10 +274,34 @@ function makeZones(label){
 function preprocess(c){
   const out=document.createElement('canvas');const scale=Math.min(3,Math.max(1.6,900/Math.max(c.width,c.height)));out.width=Math.round(c.width*scale);out.height=Math.round(c.height*scale);const ctx=out.getContext('2d');ctx.drawImage(c,0,0,out.width,out.height);const img=ctx.getImageData(0,0,out.width,out.height);const d=img.data;for(let i=0;i<d.length;i+=4){let v=(d[i]*.299+d[i+1]*.587+d[i+2]*.114);v=(v-128)*1.45+128;v=v>145?255:(v<90?0:v);d[i]=d[i+1]=d[i+2]=v}ctx.putImageData(img,0,0);return out}
 function rotateCanvas(c,deg){if(!deg)return c;const r=document.createElement('canvas'),ctx=r.getContext('2d');const rad=deg*Math.PI/180;if(Math.abs(deg)%180===90){r.width=c.height;r.height=c.width}else{r.width=c.width;r.height=c.height}ctx.translate(r.width/2,r.height/2);ctx.rotate(rad);ctx.drawImage(c,-c.width/2,-c.height/2);return r}
+
+async function detectBarcodesFromCanvas(c){
+  const results=[];
+  // 1) 浏览器原生 BarcodeDetector
+  if(barcodeDetector){
+    try{
+      const arr=await barcodeDetector.detect(c);
+      for(const b of arr||[]) results.push({raw:String(b.rawValue||''),engine:'native'});
+    }catch(e){}
+  }
+  // 2) ZXing兜底：更接近真正扫码枪的条码解码逻辑，对Code128更友好
+  if(zxingReader){
+    for(const img of [c, preprocess(c)]){
+      try{
+        const r=await zxingReader.decodeFromCanvas(img);
+        const raw=String((r&&r.getText?r.getText():r&&r.text)||'');
+        if(raw) results.push({raw,engine:'zxing'});
+      }catch(e){}
+    }
+  }
+  // 去重
+  const seen=new Set();
+  return results.filter(x=>{const k=x.engine+'|'+x.raw; if(seen.has(k)) return false; seen.add(k); return true;});
+}
 function numsFromText(t){return [...String(t||'').matchAll(/\d[\d\s\-]{10,20}\d/g)].map(m=>norm(m[0])).filter(valid)}
 
 async function phoneScannerScan(src,zones){
-  if(!work.phoneScanner || !barcodeDetector) return [];
+  if(!work.phoneScanner || (!barcodeDetector && !zxingReader)) return [];
   const now=Date.now();
   const out=[];
   // 手机当扫码枪：V22先扫绿色扫码框，再扫顶部/右侧关键区；识别到条码立即返回。
@@ -216,16 +310,18 @@ async function phoneScannerScan(src,zones){
     for(const deg of [0,90,-90,180]){
       try{
         const c=rotateCanvas(z.canvas,deg);
-        const arr=await barcodeDetector.detect(c);
+        const arr=await detectBarcodesFromCanvas(c);
         for(const b of arr){
-          const n=norm(b.rawValue);
+          const raw=String(b.raw||'');
+          const n=norm(raw);
+          updateScanInfo({stage:'条码扫描',barcode:raw||'-',reason:valid(n)?'条码解码成功，准备校验':'扫到条码内容但不是13位面单号：'+(raw||'-')});
           if(valid(n)){
             // 防止同一面单在镜头里每帧都刷日志
             if(n!==work.lastPhoneScanNo || now-work.lastPhoneScanAt>2500){
-              log('手机扫码枪扫到：'+n+'｜'+z.name,'ok');
+              log('手机扫码枪扫到：'+n+'｜'+z.name+'｜'+b.engine,'ok');
               work.lastPhoneScanNo=n; work.lastPhoneScanAt=now;
             }
-            out.push({num:n,src:'条码:手机扫码枪:'+z.name});
+            out.push({num:n,src:'条码:手机扫码枪:'+z.name+':'+b.engine});
             return out;
           }
         }
@@ -253,11 +349,11 @@ function togglePhoneScanner(){
 }
 
 async function localBarcode(zones){
-  if(!barcodeDetector) return [];
+  if(!barcodeDetector && !zxingReader) return [];
   const out=[];
   for(const z of zones.slice(0,5)){
     for(const deg of [0,90,-90,180]){
-      try{const c=rotateCanvas(z.canvas,deg);const arr=await barcodeDetector.detect(c);for(const b of arr){const n=norm(b.rawValue);if(valid(n))out.push({num:n,src:'条码:'+z.name})}}catch(e){}
+      try{const c=rotateCanvas(z.canvas,deg);const arr=await detectBarcodesFromCanvas(c);for(const b of arr){const raw=String(b.raw||'');const n=norm(raw);updateScanInfo({stage:'条码扫描',barcode:raw||'-',reason:valid(n)?'条码有效':'条码内容无效或非面单号'});if(valid(n))out.push({num:n,src:'条码:'+z.name+':'+b.engine})}}catch(e){}
       if(out.length) return out;
     }
   }
@@ -272,7 +368,7 @@ async function localOCR(zones){
       const img=preprocess(rotateCanvas(z.canvas,deg));
       try{
         const r=await Tesseract.recognize(img,'eng',{logger:()=>{}, tessedit_char_whitelist:'0123456789', preserve_interword_spaces:'1'});
-        const nums=numsFromText(r.data.text); nums.forEach(n=>out.push({num:n,src:'OCR:'+z.name}));
+        const nums=numsFromText(r.data.text); if(nums.length) updateScanInfo({stage:'OCR识别',ocr:nums.join('/'),reason:'OCR候选：'+nums.join('/')}); nums.forEach(n=>out.push({num:n,src:'OCR:'+z.name}));
         if(out.length>=2) return out;
       }catch(e){}
     }
@@ -281,9 +377,8 @@ async function localOCR(zones){
 }
 function regionKey(src){
   src=String(src||'');
+  if(src.includes('条码')||src.includes('扫码枪')) return 'barcode';
   if(src.includes('扫码框')) return 'scanbox';
-  if(src.includes('扫码枪')) return 'scanner';
-  if(src.includes('条码')) return 'barcode';
   if(src.includes('顶部')) return 'top';
   if(src.includes('右侧')||src.includes('右边')) return 'right';
   if(src.includes('左')||src.includes('边缘')) return 'edge';
@@ -315,7 +410,7 @@ async function callAI(zones){
   const now=Date.now(); if(now<work.aiCooldown) return [];
   work.aiCooldown=now+3500;
   const imgs=zones.slice(0,5).map(z=>({name:z.name,dataUrl:preprocess(z.canvas).toDataURL('image/jpeg',.86)}));
-  status('AI兜底识别中','只上传面单号小区域，不上传整张面单。');
+  status('AI兜底识别中','只上传面单号小区域，不上传整张面单。'); updateScanInfo({stage:'AI识别',ai:'请求中',reason:'本地未通过，正在请求AI兜底'});
   try{
     const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs,hint:'中国邮政/EMS面单。第一张通常是绿色扫码框区域，后面是顶部条码下方数字、右侧竖向条码旁数字、边缘竖排数字。严格只接受13位纯数字运单号，不限制首位。必须至少两处区域识别到同一13位数字，才算confirmed。不要把手机号、路由码、日期、数量、重量当成单号。'})});
     const j=await r.json(); if(!r.ok) throw new Error(j.error||r.statusText);
@@ -326,9 +421,9 @@ async function callAI(zones){
     }
     // candidates只用于日志，不作为自动开录条件，避免AI单次猜错。
     const logNums=[...new Set(arr.map(x=>x.num).concat((j.candidates||[]).map(norm).filter(valid)))];
-    if(arr.length) log('AI通过校验：'+arr.map(x=>x.src+'='+x.num).join(' / '),'ok');
-    else if(logNums.length) log('AI有候选但未满足两处一致：'+logNums.join('/'),'warn');
-    else log('AI未识别到有效单号','warn');
+    if(arr.length){ updateScanInfo({stage:'AI识别',ai:arr.map(x=>x.num).join('/'),reason:'AI两处一致，通过校验'}); log('AI通过校验：'+arr.map(x=>x.src+'='+x.num).join(' / '),'ok'); }
+    else if(logNums.length){ updateScanInfo({stage:'AI识别',ai:logNums.join('/'),reason:'AI有候选但未满足两处一致'}); log('AI有候选但未满足两处一致：'+logNums.join('/'),'warn'); }
+    else { updateScanInfo({stage:'AI识别',ai:'-',reason:'AI未识别到有效单号'}); log('AI未识别到有效单号','warn'); }
     return arr;
   }catch(e){log('AI识别失败：'+e.message,'bad');return []}
 }
@@ -336,6 +431,7 @@ async function scanLoop(force=false){
   if(!work.active || work.busy || !work.stream) return; work.busy=true;
   try{
     const src=capture(1280); if(!src) return;
+    updateScanInfo({stage:'条码扫描',reason:'正在裁剪绿色扫码框并解码'});
     const scanZone={name:'扫码框区域',canvas:crop(src,scanBoxRegion(src))};
     const box=findLabel(src); const label=crop(src,box); const zones=[scanZone,...makeZones(label)];
     let items=[];
@@ -348,19 +444,19 @@ async function scanLoop(force=false){
     if(!hit && (force || work.loopCount%2===0)){ const o=await localOCR(zones); items=items.concat(o); hit=consensus(items); }
     if(!hit && (force || ++work.localFail>=2)){ const a=await callAI(zones); items=items.concat(a); hit=consensus(items); }
     if(hit){
-      work.localFail=0; $('detectedNo').textContent=hit.num; $('sourceText').textContent=hit.src; status('校验通过',hit.num+'｜'+hit.src); pulse();
+      work.localFail=0; $('detectedNo').textContent=hit.num; $('sourceText').textContent=hit.src; status('校验通过',hit.num+'｜'+hit.src); updateScanInfo({stage:'校验成功',confirm:'通过',reason:'满足条件，开始/切换录制'}); pulse();
       if(hit.num!==recordingNo && work.lastSuccessSpoken!==hit.num){speak('success');work.lastSuccessSpoken=hit.num}
       await handleWaybill(hit.num);
     }else{
       const srcs=[...new Set(items.map(x=>x.src+':'+x.num))]; $('detectedNo').textContent=srcs.join(' / ')||'-'; $('sourceText').textContent=srcs.length?'未一致':'未识别';
-      status('专门扫码中','把顶部条码/单号或右侧条码/单号放进绿色框，保持1秒。');
+      status('专门扫码中','把顶部条码/单号或右侧条码/单号放进绿色框，保持1秒。'); updateScanInfo({confirm:'未通过',reason:srcs.length?'有候选但未满足触发条件':'未扫到条码/OCR/AI候选'});
       if(work.localFail>=4){speak('fail'); work.localFail=0}
     }
   }catch(e){log('扫描出错：'+e.message,'bad')}
   finally{work.busy=false}
 }
 async function handleWaybill(no){no=norm(no); if(!valid(no))return; if(!isRecording){startRecording(no);return} if(no===recordingNo)return; await finishRecording('检测到新面单，自动保存上一单'); startRecording(no)}
-function startRecording(no){if(!work.stream)return;chunks=[];recStart=Date.now();recordingNo=no;const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm;codecs=vp8')?'video/webm;codecs=vp8':'video/webm';mediaRecorder=new MediaRecorder(work.stream,{mimeType:mime,videoBitsPerSecond:2500000});mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};mediaRecorder.onstart=()=>{isRecording=true;$('currentNo').textContent=no;$('btnFinish').disabled=false;$('recPill').textContent='录制中 '+no;status('开始录制',no);log('开始录制：'+no,'ok');speak('start')};mediaRecorder.start(1000)}
+function startRecording(no){if(!work.stream)return;updateScanInfo({stage:'开始录制',confirm:'通过',reason:'正在录制单号 '+no});chunks=[];recStart=Date.now();recordingNo=no;const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm;codecs=vp8')?'video/webm;codecs=vp8':'video/webm';mediaRecorder=new MediaRecorder(work.stream,{mimeType:mime,videoBitsPerSecond:2500000});mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};mediaRecorder.onstart=()=>{isRecording=true;$('currentNo').textContent=no;$('btnFinish').disabled=false;$('recPill').textContent='录制中 '+no;status('开始录制',no);log('开始录制：'+no,'ok');speak('start')};mediaRecorder.start(1000)}
 async function finishRecording(reason='手动完成'){if(!isRecording||!mediaRecorder)return;return new Promise(res=>{const no=recordingNo,st=recStart,ed=Date.now();mediaRecorder.onstop=async()=>{const blob=new Blob(chunks,{type:mediaRecorder.mimeType||'video/webm'});isRecording=false;recordingNo=null;$('currentNo').textContent='-';$('btnFinish').disabled=true;$('recPill').textContent='未录制';if(blob.size)await saveRecord(no,blob,st,ed,reason);chunks=[];res()};try{mediaRecorder.stop()}catch(e){res()}})}
 function setupScanner(){
   let buf='',last=0;
@@ -386,7 +482,7 @@ $('btnManual').onclick=()=>{const n=norm($('manualNo').value);if(!valid(n))retur
 setupScanner();
 refreshScannerButton();
 updateScanEffect();
-log('V22已加载：专门扫码模式版。开始工作后，对准绿色扫码框；条码扫不到会用OCR/AI兜底，但必须满足校验才开录。');
+log('V24已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
 </script>
 </body>
 </html>
