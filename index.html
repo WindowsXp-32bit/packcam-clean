@@ -33,7 +33,7 @@ body{height:var(--app-height,100dvh)}
 .scanInfoInner{max-width:760px;margin:0 auto;background:rgba(2,6,23,.68);border:1px solid rgba(134,239,172,.28);border-radius:16px;padding:8px 10px;backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.28);font-size:11px;line-height:1.45;color:#dbeafe}
 .scanInfoGrid{display:grid;grid-template-columns:72px minmax(0,1fr);gap:3px 7px}
 .scanInfoGrid b{color:#bbf7d0;font-weight:800}.scanInfoGrid span{word-break:break-all;color:#e5efff}
-.scanInfoGrid .muted{color:#93a4bd}.scanInfoGrid .warn{color:#fde68a}.scanInfoGrid .ok{color:#86efac}.scanInfoGrid .bad{color:#fca5a5}
+.scanInfoGrid .muted{color:#93a4bd}.scanInfoGrid #scanData{max-height:42px;overflow:hidden;display:block}.scanInfoGrid .warn{color:#fde68a}.scanInfoGrid .ok{color:#86efac}.scanInfoGrid .bad{color:#fca5a5}
 
 .topbar{position:absolute;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));display:flex;gap:8px;align-items:center;justify-content:space-between;z-index:3;pointer-events:none}
 .status{max-width:76%;padding:8px 10px;border-radius:14px;background:rgba(2,6,23,.58);backdrop-filter:blur(8px);border:1px solid var(--line);font-size:13px;line-height:1.35}
@@ -119,6 +119,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
           <b>条码</b><span id="scanBarcode" class="muted">-</span>
           <b>OCR</b><span id="scanOCR" class="muted">-</span>
           <b>AI</b><span id="scanAI" class="muted">-</span>
+          <b>数据</b><span id="scanData" class="muted">-</span>
           <b>确认</b><span id="scanConfirm" class="muted">0/2</span>
           <b>状态</b><span id="scanReason" class="muted">等待开始工作</span>
         </div>
@@ -137,7 +138,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
   </section>
   <aside class="side" id="side">
     <h1>V27 登录按钮修复版</h1>
-    <div class="sub">条码区域聚焦：只把算力集中在有条码的区域，识别顶部条码下方单号和右侧条码左侧竖排单号。条码候选用于校验OCR。</div>
+    <div class="sub">快速复核抗抖：识别到13位候选后立刻复核；复核失败马上重扫。增强镜头抖动/模糊画面的OCR能力，并显示每条识别数据。</div>
 
     <div class="card">
       <div class="kv"><div class="k">账号</div><div class="v" id="accountName">未登录</div></div>
@@ -192,7 +193,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
         <option value="invert">反色增强：适合强反光/灰底</option>
         <option value="gray">灰度增强：适合普通清晰条码</option>
       </select>
-      <div class="mini">条码和OCR只聚焦面单条码区域：顶部条码/顶部单号、右侧条码/右侧竖排单号。扫到的条码原始内容会显示在下方。</div>
+      <div class="mini">条码和OCR只聚焦面单条码区域；加入锐化/高对比/反色抗抖增强。识别到的每条条码raw、OCR原文、候选单号都会显示在状态栏。</div>
       <label>员工/打包台备注</label>
       <input id="operator" placeholder="例如：1号打包台"/>
       <div class="hint">V27登录修复版：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
@@ -237,7 +238,7 @@ let barcodeDetector=null, zxingReader=null;
 let ocrWorker=null, ocrReady=false, ocrInitPromise=null, fastOcrHits={}, lastOcrCandidate='', lastOcrAt=0;
 let scanLoopTimer=null, statusUiLast=0, recordingGuardTimer=null, resultUrls=[];
 const OCR_CONFIRM_NEED=2, EDGE_CONFIRM_NEED=3, FAST_SCAN_DELAY=300, RECORDING_SCAN_DELAY=1300, MAX_RECORD_MS=8*60*1000;
-let barcodeHits={}, lastBarcodeRaw='', lastBarcodeAt=0;
+let barcodeHits={}, lastBarcodeRaw='', lastBarcodeAt=0, scanDataList=[], quickRetry=false, lastRoiFrame=null;
 
 const audio={
   start:new Audio('audio/start.mp3'),
@@ -257,7 +258,7 @@ function log(s,type=''){
 }
 function status(a,b=''){ $('statusBox').innerHTML='<b>'+a+'</b><br><span class="muted">'+b+'</span>'; $('workState').textContent=a+(b?' - '+b:''); }
 
-const scanInfoState={stage:'未开始',barcode:'-',ocr:'-',ai:'-',confirm:'0/2',reason:'等待开始工作'};
+const scanInfoState={stage:'未开始',barcode:'-',ocr:'-',ai:'-',data:'-',confirm:'0/2',reason:'等待开始工作'};
 function updateScanInfo(p={}){
   Object.assign(scanInfoState,p);
   const now=Date.now();
@@ -269,9 +270,20 @@ function updateScanInfo(p={}){
   set('scanBarcode',scanInfoState.barcode, scanInfoState.barcode&&scanInfoState.barcode!=='-'?'ok':'muted');
   set('scanOCR',scanInfoState.ocr, scanInfoState.ocr&&scanInfoState.ocr!=='-'?'warn':'muted');
   set('scanAI',scanInfoState.ai, scanInfoState.ai&&scanInfoState.ai!=='-'?'warn':'muted');
+  set('scanData',scanInfoState.data, scanInfoState.data&&scanInfoState.data!=='-'?'ok':'muted');
   set('scanConfirm',scanInfoState.confirm, String(scanInfoState.confirm).includes('通过')?'ok':'muted');
   let cls='muted'; if(String(scanInfoState.reason).includes('开始')||String(scanInfoState.reason).includes('通过')) cls='ok'; if(String(scanInfoState.reason).includes('排除')||String(scanInfoState.reason).includes('未')) cls='warn'; if(String(scanInfoState.reason).includes('失败')||String(scanInfoState.reason).includes('错误')) cls='bad';
   set('scanReason',scanInfoState.reason,cls);
+}
+
+function addScanData(src,val,tag=''){
+  val=String(val||'').trim();
+  if(!val) return;
+  const now=new Date().toLocaleTimeString('zh-CN',{hour12:false});
+  const text=now+' '+src+'：'+val+(tag?'｜'+tag:'');
+  if(scanDataList[0]!==text) scanDataList.unshift(text);
+  scanDataList=scanDataList.slice(0,6);
+  updateScanInfo({data:scanDataList.join(' / '),force:true});
 }
 function summarizeItems(items){
   const s=[...new Set((items||[]).map(x=>(x.src||'未知')+':'+(x.num||'-')))];
@@ -306,10 +318,11 @@ function waybillCandidatesFromBarcode(raw){
 }
 function rememberBarcode(raw, src){
   const now=Date.now();
-  lastBarcodeRaw=String(raw||''); lastBarcodeAt=now;
+  lastBarcodeRaw=String(raw||''); lastBarcodeAt=now; addScanData('条码raw', lastBarcodeRaw.slice(0,60));
   for(const [k,v] of Object.entries(barcodeHits)){ if(now-v.last>5000) delete barcodeHits[k]; }
   const nums=waybillCandidatesFromBarcode(raw);
   nums.forEach(n=>{
+    addScanData('条码候选', n, src||'');
     barcodeHits[n]??={count:0,last:0,srcs:new Set(),raws:new Set()};
     const rec=barcodeHits[n];
     if(now-rec.last>300){ rec.count++; rec.last=now; }
@@ -551,12 +564,12 @@ function stopCamera(){ if(work.stream){work.stream.getTracks().forEach(t=>t.stop
 async function startWork(){
   if(!(await ensureAccountActive())) return;
   await startCamera();
-  work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0; work.loopCount=0; fastOcrHits={}; barcodeHits={}; lastBarcodeRaw=''; lastOcrCandidate='';
+  work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0; work.loopCount=0; fastOcrHits={}; barcodeHits={}; scanDataList=[]; quickRetry=false; lastBarcodeRaw=''; lastOcrCandidate='';
   $('btnStart').disabled=true;$('btnStop').disabled=false;$('btnScan').disabled=false;$('btnFinish').disabled=!isRecording;
-  status('工作中','条码区域聚焦：只识别顶部条码下方单号和右侧条码旁竖排单号。当前：'+qualityProfile().label);
-  log('开始工作：条码区域聚焦模式已启动，算力集中到条码附近单号｜'+qualityProfile().label,'ok');
+  status('工作中','抗抖快速复核：13位候选出现后立即复核，失败马上重扫。当前：'+qualityProfile().label);
+  log('开始工作：抗抖快速复核已启动，识别到每条数据都会显示在状态栏｜'+qualityProfile().label,'ok');
   updateScanEffect();
-  updateScanInfo({stage:'条码区域聚焦',barcode:'-',ocr:'-',ai:'关闭',confirm:'0/2',reason:'请让顶部条码下方单号/右侧条码旁竖排单号清晰入镜',force:true});
+  updateScanInfo({stage:'OCR抗抖复核',barcode:'-',ocr:'-',ai:'关闭',data:'-',confirm:'0/2',reason:'识别到13位后立刻复核；复核失败马上重扫',force:true});
   if(work.scanTimer) clearInterval(work.scanTimer); work.scanTimer=null; if(scanLoopTimer) clearTimeout(scanLoopTimer); ensureOCR(); scheduleNextScan(150);
 }
 async function stopWork(){
@@ -770,11 +783,11 @@ async function ensureOCR(){
   })();
   return ocrInitPromise;
 }
-function preprocessFast(c, rotate=0){
+function preprocessFast(c, rotate=0, mode='contrast'){
   c=rotateCanvas(c,rotate);
   const out=document.createElement('canvas');
-  const maxSide=isRecording?560:680;
-  const scale=Math.min(2,Math.max(1.15,maxSide/Math.max(c.width,c.height)));
+  const maxSide=isRecording?620:780;
+  const scale=Math.min(2.35,Math.max(1.2,maxSide/Math.max(c.width,c.height)));
   out.width=Math.max(1,Math.round(c.width*scale));
   out.height=Math.max(1,Math.round(c.height*scale));
   const ctx=out.getContext('2d',{willReadFrequently:true});
@@ -783,12 +796,48 @@ function preprocessFast(c, rotate=0){
   const img=ctx.getImageData(0,0,out.width,out.height), d=img.data;
   for(let i=0;i<d.length;i+=4){
     let v=d[i]*.299+d[i+1]*.587+d[i+2]*.114;
-    v=(v-128)*1.75+128;
-    v=v>150?255:(v<105?0:v);
-    d[i]=d[i+1]=d[i+2]=v;
+    if(mode==='gray'){
+      v=(v-128)*1.45+128;
+    }else if(mode==='invert'){
+      v=255-((v-128)*1.75+128);
+      v=v>145?255:(v<112?0:v);
+    }else{
+      v=(v-128)*1.95+128;
+      v=v>148?255:(v<108?0:v);
+    }
+    d[i]=d[i+1]=d[i+2]=Math.max(0,Math.min(255,v));
   }
   ctx.putImageData(img,0,0);
+  if(mode==='sharp') sharpenCanvas(out);
   return out;
+}
+function sharpenCanvas(c){
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+  const img=ctx.getImageData(0,0,c.width,c.height), src=new Uint8ClampedArray(img.data), d=img.data;
+  const w=c.width,h=c.height;
+  for(let y=1;y<h-1;y++){
+    for(let x=1;x<w-1;x++){
+      const i=(y*w+x)*4;
+      let v=src[i]*5-src[i-4]-src[i+4]-src[i-w*4]-src[i+w*4];
+      v=Math.max(0,Math.min(255,v));
+      d[i]=d[i+1]=d[i+2]=v;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  return c;
+}
+function ocrVisualModes(){
+  // 运动模糊/手抖时，单一阈值容易失败；这里快速尝试多种视觉增强。
+  return isRecording ? ['contrast','sharp'] : ['contrast','sharp','gray','invert'];
+}
+async function recognizeFastCanvasVariants(canvas, rotate=0){
+  const texts=[];
+  for(const mode of ocrVisualModes()){
+    const img=preprocessFast(canvas,rotate,mode);
+    const text=await recognizeFastCanvas(img);
+    if(text) texts.push({mode,text});
+  }
+  return texts;
 }
 async function recognizeFastCanvas(canvas){
   if(await ensureOCR()){
@@ -802,6 +851,7 @@ function rememberOcr(nums, src){
   for(const [k,v] of Object.entries(fastOcrHits)){ if(now-v.last>4000) delete fastOcrHits[k]; }
   nums.forEach(n=>{
     if(!valid(n)) return;
+    addScanData('OCR候选', n, src);
     fastOcrHits[n]??={count:0,last:0,srcs:new Set()};
     const rec=fastOcrHits[n];
     if(now-rec.last>450){ rec.count++; rec.last=now; }
@@ -822,24 +872,27 @@ async function localOCR(zones){
 
   const scanOne = async (z, deg, name)=>{
     if(!z) return [];
-    const img=preprocessFast(z.canvas,deg);
-    const text=await recognizeFastCanvas(img);
-    const nums=numsFromText(text);
-    if(nums.length){
-      updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR条码区聚焦',ocr:nums.join('/'),reason:name+' 候选：'+nums.join('/')+(nums.some(hasBarcodeConfirm)?'｜条码一致':'')});
-      const items=rememberOcr(nums,name);
-      lastOcrCandidate=nums[0]; lastOcrAt=Date.now();
-      return items;
+    const results=await recognizeFastCanvasVariants(z.canvas,deg);
+    for(const r of results){
+      const nums=numsFromText(r.text);
+      if(nums.length){
+        updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR抗抖识别',ocr:nums.join('/'),reason:name+' '+r.mode+' 候选：'+nums.join('/')+(nums.some(hasBarcodeConfirm)?'｜条码一致':'')});
+        addScanData('OCR-'+name, nums.join('/'), r.mode);
+        const items=rememberOcr(nums,name);
+        lastOcrCandidate=nums[0]; lastOcrAt=Date.now();
+        return items;
+      }else if(r.text && r.text.replace(/\s+/g,'').length){
+        addScanData('OCR原文-'+name, r.text.replace(/\s+/g,'').slice(0,30), r.mode);
+      }
     }
     return [];
   };
 
-  // V35：OCR只读两个固定文本区域：
-  // 顶部横向条码下面的快递单号、右侧条码左边竖排的快递单号。
+  // V36：只读条码附近固定单号区，但每个区做抗抖/模糊视觉增强。
   out.push(...await scanOne(topNo,0,'顶部条码下方单号'));
   let hit=ocrStable(out);
   if(hit || out.length){
-    // 顶部有候选后，立即补扫右侧竖排单号做互证
+    // 识别到13位后立刻复核右侧；复核失败则主循环会快速重扫。
     if(!hit && !isRecording && rightNo) out.push(...await scanOne(rightNo,90,'右侧条码左侧竖排单号'));
     return out;
   }
@@ -851,7 +904,7 @@ async function localOCR(zones){
     if(out.length) return out;
   }
 
-  updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR条码区聚焦',ocr:'-',reason:isRecording?'录制中低频扫描条码区域':'只扫描条码附近单号，暂未读到13位'});
+  updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR抗抖识别',ocr:'-',reason:isRecording?'录制中低频扫描条码区域':'条码附近单号未读到，马上重扫'});
   return out;
 }
 function ocrStable(items){
@@ -945,19 +998,27 @@ async function callAI(zones){
 }
 async function scanLoop(force=false){
   if(!work.active || work.busy || !work.stream || document.hidden) return;
-  work.busy=true;
+  work.busy=true; quickRetry=false;
   try{
     const q=qualityProfile(); const src=capture(isRecording?q.ocrRec:q.ocrIdle); if(!src) return;
-    updateScanInfo({stage:isRecording?'录制中低频扫描':'OCR极速识别',reason:isRecording?'录制中自动降频，避免卡顿':'条码区域聚焦中：只扫描顶部条码下方和右侧条码旁单号'});
+    updateScanInfo({stage:isRecording?'录制中低频扫描':'OCR抗抖复核',reason:isRecording?'录制中低频，保护录像':'识别到13位后立即复核；失败马上重扫'});
     const box=findLabel(src); const label=crop(src,box); const zones=makeZones(label);
     work.loopCount=(work.loopCount||0)+1;
     let items=[];
 
     const o=await localOCR(zones); items=items.concat(o);
     let hit=ocrStable(items);
+    const hasOcrCandidate=items.some(x=>String(x.src||'').includes('OCR') && valid(x.num));
 
-    // 条码辅助降频运行，避免录制时抢CPU
-    if(!hit && (force || (!isRecording && work.loopCount%3===0) || (isRecording && work.loopCount%5===0))){
+    // 识别到13位候选后，立刻复核条码区域；不等下一轮。
+    if(!hit && hasOcrCandidate){
+      const b=await localBarcode(zones); items=items.concat(b);
+      hit=consensus(items) || ocrStable(items);
+      if(!hit) quickRetry=true;
+    }
+
+    // 没有OCR候选时，条码低频辅助；强制补扫时立即执行。
+    if(!hit && !hasOcrCandidate && (force || (!isRecording && work.loopCount%2===0) || (isRecording && work.loopCount%5===0))){
       const ps=await phoneScannerScan(src,zones); items=items.concat(ps);
       const b=await localBarcode(zones); items=items.concat(b);
       hit=consensus(items) || ocrStable(items);
@@ -970,23 +1031,26 @@ async function scanLoop(force=false){
     }
 
     if(hit){
+      quickRetry=false;
       work.localFail=0;
       $('detectedNo').textContent=hit.num;
       $('sourceText').textContent=hit.src;
       status(isRecording?'检测到下一单':'OCR确认通过', hit.num+'｜'+(hit.engines||hit.src));
-      updateScanInfo({stage:'校验成功',confirm:'通过',reason:'条码区锁定：'+(hit.engines||hit.src),force:true});
+      updateScanInfo({stage:'校验成功',confirm:'通过',reason:'快速复核通过：'+(hit.engines||hit.src),force:true});
+      addScanData('锁定',hit.num,hit.engines||hit.src);
       pulse();
       if(hit.num!==recordingNo && work.lastSuccessSpoken!==hit.num){speak('success');work.lastSuccessSpoken=hit.num}
       await handleWaybill(hit.num);
     }else{
       const srcs=[...new Set(items.filter(x=>valid(x.num)).map(x=>x.src+':'+x.num))];
       $('detectedNo').textContent=srcs.join(' / ')||'-';
-      $('sourceText').textContent=srcs.length?'OCR候选稳定中':'-';
+      $('sourceText').textContent=srcs.length?'已识别候选，快速复核中':'-';
       work.localFail++;
-      const stableText=lastOcrCandidate?('候选 '+lastOcrCandidate+'，正在快速复核'):(isRecording?'录制中低频扫描下一单':'请让单号区域更清晰');
-      status(isRecording?'录制中':'OCR扫描中', stableText);
-      updateScanInfo({confirm:'未通过',reason:srcs.length?stableText:'未识别到有效13位单号'});
+      const stableText=lastOcrCandidate?('候选 '+lastOcrCandidate+'，复核失败马上重扫'):(isRecording?'录制中低频扫描下一单':'请让条码附近单号更清晰');
+      status(isRecording?'录制中':'快速识别中', stableText);
+      updateScanInfo({confirm:'未通过',reason:srcs.length?stableText:'暂未识别到有效13位单号'});
       if(!isRecording && work.localFail>=10){speak('fail'); work.localFail=0}
+      if(hasOcrCandidate) quickRetry=true;
     }
   }catch(e){log('扫描出错：'+e.message,'bad')}
   finally{work.busy=false}
@@ -996,7 +1060,7 @@ function scheduleNextScan(delay){
   if(!work.active) return;
   scanLoopTimer=setTimeout(async()=>{
     await scanLoop(false);
-    scheduleNextScan(isRecording?RECORDING_SCAN_DELAY:FAST_SCAN_DELAY);
+    scheduleNextScan(quickRetry?90:(isRecording?RECORDING_SCAN_DELAY:FAST_SCAN_DELAY));
   }, delay);
 }
 
@@ -1049,14 +1113,14 @@ $('btnManual').onclick=()=>{const n=norm($('manualNo').value);if(!valid(n))retur
 
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){ if(scanLoopTimer) clearTimeout(scanLoopTimer); scanLoopTimer=null; log('页面进入后台，暂停识别以保护录像性能','warn'); }
-  else if(work.active){ log('页面恢复前台，继续识别','ok'); scheduleNextScan(isRecording?RECORDING_SCAN_DELAY:FAST_SCAN_DELAY); }
+  else if(work.active){ log('页面恢复前台，继续识别','ok'); scheduleNextScan(quickRetry?90:(isRecording?RECORDING_SCAN_DELAY:FAST_SCAN_DELAY)); }
 });
 
 setupAuthUI();
 setupScanner();
 refreshScannerButton();
 updateScanEffect();
-log('V35已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
+log('V36已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
 </script>
 </body>
 </html>
