@@ -137,7 +137,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
   </section>
   <aside class="side" id="side">
     <h1>V27 登录按钮修复版</h1>
-    <div class="sub">条码OCR互证：条码解码结果作为OCR校验依据；OCR识别到的13位单号若与条码候选一致，可快速绑定。重复单号仍只保留最新录制。</div>
+    <div class="sub">条码区域聚焦：只把算力集中在有条码的区域，识别顶部条码下方单号和右侧条码左侧竖排单号。条码候选用于校验OCR。</div>
 
     <div class="card">
       <div class="kv"><div class="k">账号</div><div class="v" id="accountName">未登录</div></div>
@@ -192,7 +192,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
         <option value="invert">反色增强：适合强反光/灰底</option>
         <option value="gray">灰度增强：适合普通清晰条码</option>
       </select>
-      <div class="mini">条码主要用来和OCR互相验证；扫到的条码原始内容会显示在下方。</div>
+      <div class="mini">条码和OCR只聚焦面单条码区域：顶部条码/顶部单号、右侧条码/右侧竖排单号。扫到的条码原始内容会显示在下方。</div>
       <label>员工/打包台备注</label>
       <input id="operator" placeholder="例如：1号打包台"/>
       <div class="hint">V27登录修复版：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
@@ -553,10 +553,10 @@ async function startWork(){
   await startCamera();
   work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0; work.loopCount=0; fastOcrHits={}; barcodeHits={}; lastBarcodeRaw=''; lastOcrCandidate='';
   $('btnStart').disabled=true;$('btnStop').disabled=false;$('btnScan').disabled=false;$('btnFinish').disabled=!isRecording;
-  status('工作中','准快平衡：顶部单号2次同号快速锁定，低可信候选继续复核。当前：'+qualityProfile().label);
-  log('开始工作：准快平衡模式已启动，又快又准｜'+qualityProfile().label,'ok');
+  status('工作中','条码区域聚焦：只识别顶部条码下方单号和右侧条码旁竖排单号。当前：'+qualityProfile().label);
+  log('开始工作：条码区域聚焦模式已启动，算力集中到条码附近单号｜'+qualityProfile().label,'ok');
   updateScanEffect();
-  updateScanInfo({stage:'OCR准快识别',barcode:'-',ocr:'-',ai:'关闭',confirm:'0/2',reason:'请优先让顶部横向单号清晰入镜；顶部2次同号即可锁定',force:true});
+  updateScanInfo({stage:'条码区域聚焦',barcode:'-',ocr:'-',ai:'关闭',confirm:'0/2',reason:'请让顶部条码下方单号/右侧条码旁竖排单号清晰入镜',force:true});
   if(work.scanTimer) clearInterval(work.scanTimer); work.scanTimer=null; if(scanLoopTimer) clearTimeout(scanLoopTimer); ensureOCR(); scheduleNextScan(150);
 }
 async function stopWork(){
@@ -588,13 +588,18 @@ function findLabel(src){
 function makeZones(label){
   const w=label.width,h=label.height;
   const z=(name,x,y,ww,hh)=>({name,canvas:crop({canvas:label,w,h},{x:x*w,y:y*h,w:ww*w,h:hh*h})});
+  // V35：固定只识别有条码的区域，避免把算力浪费到整张面单。
+  // 1. 顶部横向条码区域
+  // 2. 顶部条码下方的横向快递单号
+  // 3. 右侧竖向条码区域
+  // 4. 右侧条码左边竖排快递单号
   return [
-    z('顶部条码和下方单号',.02,.00,.96,.27),
-    z('顶部数字单号加宽',.02,.09,.96,.17),
-    z('右侧竖向单号',.62,.02,.36,.64),
-    z('右边缘竖向单号',.74,.00,.24,.82),
-    z('左/边缘兜底',.00,.02,.24,.82),
-    {name:'整张面单',canvas:label}
+    z('顶部横向条码区',.04,.00,.92,.13),
+    z('顶部条码下方单号',.06,.10,.88,.17),
+    z('右侧竖向条码区',.78,.02,.20,.70),
+    z('右侧条码左侧竖排单号',.55,.02,.25,.72),
+    z('顶部条码+单号组合区',.04,.00,.92,.28),
+    z('右侧条码+竖排单号组合区',.52,.00,.46,.76)
   ];
 }
 function preprocess(c){
@@ -669,7 +674,7 @@ async function phoneScannerScan(src,zones){
   const now=Date.now();
   const out=[];
   // 手机当扫码枪：V22先扫绿色扫码框，再扫顶部/右侧关键区；识别到条码立即返回。
-  const list=[zones[0],zones[1],zones[2],zones[3],zones[4],{name:'全画面兜底',canvas:src.canvas}].filter(Boolean);
+  const list=zones.filter(z=>z && (z.name.includes('条码区')||z.name.includes('组合区'))).slice(0,4);
   for(const z of list){
     for(const deg of [0,90,-90,180]){
       try{
@@ -715,9 +720,20 @@ function togglePhoneScanner(){
 async function localBarcode(zones){
   if(!barcodeDetector && !zxingReader) return [];
   const out=[];
-  for(const z of zones.slice(0,5)){
-    for(const deg of [0,90,-90,180]){
-      try{const c=rotateCanvas(z.canvas,deg);const arr=await detectBarcodesFromCanvas(c);for(const b of arr){const raw=String(b.raw||'');const nums=rememberBarcode(raw,'条码:'+z.name+':'+b.engine);updateScanInfo({stage:'条码扫描',barcode:raw||'-',reason:nums.length?'条码候选：'+nums.map(x=>x.num).join('/'):'条码内容未提取到13位单号'});out.push(...nums)}}catch(e){}
+  const list=zones.filter(z=>z.name.includes('条码区')||z.name.includes('组合区'));
+  for(const z of list){
+    const degs=z.name.includes('右侧')?[0,90,-90]:[0];
+    for(const deg of degs){
+      try{
+        const c=rotateCanvas(z.canvas,deg);
+        const arr=await detectBarcodesFromCanvas(c);
+        for(const b of arr){
+          const raw=String(b.raw||'');
+          const nums=rememberBarcode(raw,'条码:'+z.name+':'+b.engine);
+          updateScanInfo({stage:'条码区域扫描',barcode:raw||'-',reason:nums.length?'条码候选：'+nums.map(x=>x.num).join('/'):'条码已读到但未提取13位单号'});
+          out.push(...nums);
+        }
+      }catch(e){}
       if(out.length) return out;
     }
   }
@@ -801,10 +817,8 @@ function rememberOcr(nums, src){
 async function localOCR(zones){
   if(!window.Tesseract) return [];
   const out=[];
-  const top=zones.find(z=>z.name.includes('顶部数字')) || zones[1] || zones[0];
-  const topFull=zones.find(z=>z.name.includes('顶部条码')) || zones[0];
-  const right=zones.find(z=>z.name.includes('右侧')) || zones[2];
-  const edge=zones.find(z=>z.name.includes('边缘')) || zones[3];
+  const topNo=zones.find(z=>z.name.includes('顶部条码下方单号')) || zones[1];
+  const rightNo=zones.find(z=>z.name.includes('右侧条码左侧竖排单号')) || zones[3];
 
   const scanOne = async (z, deg, name)=>{
     if(!z) return [];
@@ -812,7 +826,7 @@ async function localOCR(zones){
     const text=await recognizeFastCanvas(img);
     const nums=numsFromText(text);
     if(nums.length){
-      updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR条码互证',ocr:nums.join('/'),reason:name+' 候选：'+nums.join('/')+(nums.some(hasBarcodeConfirm)?'｜条码一致':'')});
+      updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR条码区聚焦',ocr:nums.join('/'),reason:name+' 候选：'+nums.join('/')+(nums.some(hasBarcodeConfirm)?'｜条码一致':'')});
       const items=rememberOcr(nums,name);
       lastOcrCandidate=nums[0]; lastOcrAt=Date.now();
       return items;
@@ -820,40 +834,24 @@ async function localOCR(zones){
     return [];
   };
 
-  // 1) 顶部数字区优先，最快、最高可信
-  out.push(...await scanOne(top,0,'顶部数字区'));
+  // V35：OCR只读两个固定文本区域：
+  // 顶部横向条码下面的快递单号、右侧条码左边竖排的快递单号。
+  out.push(...await scanOne(topNo,0,'顶部条码下方单号'));
   let hit=ocrStable(out);
-  if(hit || out.length) {
-    // 顶部刚出现候选但还没锁定时，立即补扫右侧一次，争取同一轮多区域确认
-    if(!hit && !isRecording && right) out.push(...await scanOne(right,90,'右侧竖排'));
+  if(hit || out.length){
+    // 顶部有候选后，立即补扫右侧竖排单号做互证
+    if(!hit && !isRecording && rightNo) out.push(...await scanOne(rightNo,90,'右侧条码左侧竖排单号'));
     return out;
   }
 
-  // 2) 顶部条码下方再扫一次，提升顶部命中率
-  out.push(...await scanOne(topFull,0,'顶部条码下方'));
-  hit=ocrStable(out);
-  if(hit || out.length) {
-    if(!hit && !isRecording && right) out.push(...await scanOne(right,90,'右侧竖排'));
-    return out;
-  }
-
-  // 3) 未命中顶部时，再扫右侧；边缘只低频兜底
-  if(!isRecording || (work.loopCount||0)%2===0){
-    if(right){
-      out.push(...await scanOne(right,90,'右侧竖排'));
-      if(out.length) return out;
-      out.push(...await scanOne(right,-90,'右侧竖排'));
-      if(out.length) return out;
-    }
-  }
-  if(!isRecording && (work.loopCount||0)%3===0 && edge){
-    out.push(...await scanOne(edge,90,'边缘竖排'));
+  if(rightNo){
+    out.push(...await scanOne(rightNo,90,'右侧条码左侧竖排单号'));
     if(out.length) return out;
-    out.push(...await scanOne(edge,-90,'边缘竖排'));
+    out.push(...await scanOne(rightNo,-90,'右侧条码左侧竖排单号'));
     if(out.length) return out;
   }
 
-  updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR准快识别',ocr:'-',reason:isRecording?'录制中低频扫描，减少卡顿':'暂未读到13位单号，继续扫描'});
+  updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR条码区聚焦',ocr:'-',reason:isRecording?'录制中低频扫描条码区域':'只扫描条码附近单号，暂未读到13位'});
   return out;
 }
 function ocrStable(items){
@@ -862,28 +860,26 @@ function ocrStable(items){
     const rec=fastOcrHits[n];
     if(!valid(n) || !rec) continue;
     const srcs=[...rec.srcs];
-    const hasTop=srcs.some(s=>s.includes('顶部'));
-    const hasRight=srcs.some(s=>s.includes('右侧'));
-    const hasEdge=srcs.some(s=>s.includes('边缘'));
-    const multiRegion=hasTop && (hasRight || hasEdge);
+    const hasTop=srcs.some(s=>s.includes('顶部条码下方'));
+    const hasRight=srcs.some(s=>s.includes('右侧条码左侧'));
+    const multiRegion=hasTop && hasRight;
     const barcodeOK=hasBarcodeConfirm(n);
 
-    // V34 条码+OCR互证：
-    // 1) OCR候选和条码候选一致：最快通过；
-    // 2) 顶部+右侧/边缘同号：快速通过；
-    // 3) 顶部高可信区域单独2次：通过；
-    // 4) 只有边缘兜底：3次才通过。
+    // V35：固定条码区域内校验
+    // 1) 条码候选 + OCR同号：最快通过；
+    // 2) 顶部条码下方单号 + 右侧条码左侧单号同号：快速通过；
+    // 3) 顶部固定单号区域连续2次：通过；
+    // 4) 只有右侧竖排区域：连续2次通过。
     let need=OCR_CONFIRM_NEED;
-    let mode='OCR多帧稳定';
+    let mode='条码区OCR多帧稳定';
     if(barcodeOK && rec.count>=1){ need=1; mode='条码+OCR互证'; }
-    else if(multiRegion){ need=2; mode='OCR多区域一致'; }
-    else if(hasTop){ need=2; mode='OCR顶部高可信'; }
-    else if(hasRight){ need=2; mode='OCR右侧稳定'; }
-    else if(hasEdge){ need=EDGE_CONFIRM_NEED; mode='OCR边缘严格'; }
+    else if(multiRegion){ need=2; mode='顶部+右侧固定区一致'; }
+    else if(hasTop){ need=2; mode='顶部条码下方高可信'; }
+    else if(hasRight){ need=2; mode='右侧条码旁稳定'; }
 
     if(rec.count>=need){
       const extra=barcodeOK?'｜'+barcodeConfirmText(n):'';
-      return {num:n,src:'OCR条码锁定 '+rec.count+'/'+need+'｜'+srcs.join('+')+extra,engines:mode};
+      return {num:n,src:'条码区锁定 '+rec.count+'/'+need+'｜'+srcs.join('+')+extra,engines:mode};
     }
   }
   return null;
@@ -952,9 +948,8 @@ async function scanLoop(force=false){
   work.busy=true;
   try{
     const q=qualityProfile(); const src=capture(isRecording?q.ocrRec:q.ocrIdle); if(!src) return;
-    updateScanInfo({stage:isRecording?'录制中低频扫描':'OCR极速识别',reason:isRecording?'录制中自动降频，避免卡顿':'OCR+条码互证中：条码候选会用于校验OCR单号'});
-    const scanZone={name:'扫码框区域',canvas:crop(src,scanBoxRegion(src))};
-    const box=findLabel(src); const label=crop(src,box); const zones=[scanZone,...makeZones(label)];
+    updateScanInfo({stage:isRecording?'录制中低频扫描':'OCR极速识别',reason:isRecording?'录制中自动降频，避免卡顿':'条码区域聚焦中：只扫描顶部条码下方和右侧条码旁单号'});
+    const box=findLabel(src); const label=crop(src,box); const zones=makeZones(label);
     work.loopCount=(work.loopCount||0)+1;
     let items=[];
 
@@ -979,7 +974,7 @@ async function scanLoop(force=false){
       $('detectedNo').textContent=hit.num;
       $('sourceText').textContent=hit.src;
       status(isRecording?'检测到下一单':'OCR确认通过', hit.num+'｜'+(hit.engines||hit.src));
-      updateScanInfo({stage:'校验成功',confirm:'通过',reason:'OCR条码锁定：'+(hit.engines||hit.src),force:true});
+      updateScanInfo({stage:'校验成功',confirm:'通过',reason:'条码区锁定：'+(hit.engines||hit.src),force:true});
       pulse();
       if(hit.num!==recordingNo && work.lastSuccessSpoken!==hit.num){speak('success');work.lastSuccessSpoken=hit.num}
       await handleWaybill(hit.num);
@@ -1061,7 +1056,7 @@ setupAuthUI();
 setupScanner();
 refreshScannerButton();
 updateScanEffect();
-log('V34已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
+log('V35已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
 </script>
 </body>
 </html>
