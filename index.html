@@ -137,7 +137,7 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
   </section>
   <aside class="side" id="side">
     <h1>V27 登录按钮修复版</h1>
-    <div class="sub">最新录制：同一单号重复录制时，只保留最新视频，自动删除之前旧视频，避免查询混乱。</div>
+    <div class="sub">条码OCR互证：条码解码结果作为OCR校验依据；OCR识别到的13位单号若与条码候选一致，可快速绑定。重复单号仍只保留最新录制。</div>
 
     <div class="card">
       <div class="kv"><div class="k">账号</div><div class="v" id="accountName">未登录</div></div>
@@ -185,6 +185,14 @@ label{display:block;color:#cbd5e1;font-size:12px;margin:10px 0 5px}input,select{
         <option value="clear">高清识别：1080p + 更高清码率，识别优先</option>
       </select>
       <div class="mini">改模式后建议停止工作再重新开始。准快规则：顶部高可信区域连续2次同号即可锁定；顶部+侧边同号更稳；只有边缘兜底识别时需3次同号。</div>
+      <label>条码视觉增强</label>
+      <select id="barcodeEnhance">
+        <option value="auto" selected>自动：原图/高对比/反色都尝试</option>
+        <option value="contrast">黑白高对比：适合打印浅、反光</option>
+        <option value="invert">反色增强：适合强反光/灰底</option>
+        <option value="gray">灰度增强：适合普通清晰条码</option>
+      </select>
+      <div class="mini">条码主要用来和OCR互相验证；扫到的条码原始内容会显示在下方。</div>
       <label>员工/打包台备注</label>
       <input id="operator" placeholder="例如：1号打包台"/>
       <div class="hint">V27登录修复版：开始工作后，把顶部横向长条码尽量放进绿色框。系统会裁剪扫码框、放大增强、多角度/多帧解码。画面下方会显示条码原始结果、OCR候选、AI候选、确认次数和触发原因。</div>
@@ -229,6 +237,7 @@ let barcodeDetector=null, zxingReader=null;
 let ocrWorker=null, ocrReady=false, ocrInitPromise=null, fastOcrHits={}, lastOcrCandidate='', lastOcrAt=0;
 let scanLoopTimer=null, statusUiLast=0, recordingGuardTimer=null, resultUrls=[];
 const OCR_CONFIRM_NEED=2, EDGE_CONFIRM_NEED=3, FAST_SCAN_DELAY=300, RECORDING_SCAN_DELAY=1300, MAX_RECORD_MS=8*60*1000;
+let barcodeHits={}, lastBarcodeRaw='', lastBarcodeAt=0;
 
 const audio={
   start:new Audio('audio/start.mp3'),
@@ -279,12 +288,50 @@ function valid(n){
   if(/202[0-9]/.test(n)) return false;
   return true;
 }
+function barcodeMode(){ return ($('barcodeEnhance')&&$('barcodeEnhance').value) || localStorage.getItem('packcam_barcode_enhance') || 'auto'; }
+function waybillCandidatesFromBarcode(raw){
+  raw=String(raw||'').trim();
+  const out=new Set();
+  // 条码原文正好是13位纯数字，可信度最高
+  const exact=raw.replace(/[^\d]/g,'');
+  if(valid(exact) && exact.length===13) out.add(exact);
+  // 原文里可能夹有前后缀，提取连续13位数字候选
+  for(const m of raw.matchAll(/\d{13}/g)){ if(valid(m[0])) out.add(m[0]); }
+  // 部分条码会带空格/短横，先净化后再滑窗找13位
+  const d=raw.replace(/[^\d]/g,'');
+  for(let i=0;i<=d.length-13;i++){
+    const n=d.slice(i,i+13); if(valid(n)) out.add(n);
+  }
+  return [...out];
+}
+function rememberBarcode(raw, src){
+  const now=Date.now();
+  lastBarcodeRaw=String(raw||''); lastBarcodeAt=now;
+  for(const [k,v] of Object.entries(barcodeHits)){ if(now-v.last>5000) delete barcodeHits[k]; }
+  const nums=waybillCandidatesFromBarcode(raw);
+  nums.forEach(n=>{
+    barcodeHits[n]??={count:0,last:0,srcs:new Set(),raws:new Set()};
+    const rec=barcodeHits[n];
+    if(now-rec.last>300){ rec.count++; rec.last=now; }
+    rec.srcs.add(src||'条码'); rec.raws.add(String(raw||''));
+  });
+  return nums.map(n=>({num:n,src:'条码候选:'+src+':'+barcodeHits[n].count}));
+}
+function hasBarcodeConfirm(n){
+  n=norm(n); return valid(n) && barcodeHits[n] && barcodeHits[n].count>=1;
+}
+function barcodeConfirmText(n){
+  const rec=barcodeHits[n]; if(!rec) return '';
+  return '条码互证 '+rec.count+'次｜'+[...rec.srcs].join('+');
+}
+
 function speak(key){ if(!work.active && key!=='test') return; const a= audio[key]||audio.success; try{a.pause();a.currentTime=0;a.play().catch(()=>{}); if(navigator.vibrate) navigator.vibrate(key==='fail'?[120,60,120]:[80]);}catch(e){} }
 function testVoice(){ audio.success.play().catch(()=>{}); setTimeout(()=>audio.start.play().catch(()=>{}),500); setTimeout(()=>audio.complete.play().catch(()=>{}),1050); }
 function saveCfg(){
   localStorage.setItem('packcam_ai_endpoint',$('aiEndpoint').value.trim());
   localStorage.setItem('packcam_ai_mode',$('aiMode').value);
   localStorage.setItem('packcam_quality_mode',$('qualityMode')?$('qualityMode').value:'smart');
+  localStorage.setItem('packcam_barcode_enhance',$('barcodeEnhance')?$('barcodeEnhance').value:'auto');
   log('设置已保存。画质模式变更后，建议停止工作再重新开始。','ok')
 }
 function qualityMode(){ return ($('qualityMode')&&$('qualityMode').value) || localStorage.getItem('packcam_quality_mode') || 'smart'; }
@@ -402,6 +449,7 @@ function loadCfg(){
   $('aiEndpoint').value=localStorage.getItem('packcam_ai_endpoint')||'';
   $('aiMode').value=localStorage.getItem('packcam_ai_mode')||'off';
   if($('qualityMode')) $('qualityMode').value=localStorage.getItem('packcam_quality_mode')||'smart';
+  if($('barcodeEnhance')) $('barcodeEnhance').value=localStorage.getItem('packcam_barcode_enhance')||'auto';
 }
 loadCfg();
 
@@ -503,7 +551,7 @@ function stopCamera(){ if(work.stream){work.stream.getTracks().forEach(t=>t.stop
 async function startWork(){
   if(!(await ensureAccountActive())) return;
   await startCamera();
-  work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0; work.loopCount=0; fastOcrHits={}; lastOcrCandidate='';
+  work.active=true; work.localFail=0; work.aiCooldown=0; work.lastNo=''; work.lastNoCount=0; work.loopCount=0; fastOcrHits={}; barcodeHits={}; lastBarcodeRaw=''; lastOcrCandidate='';
   $('btnStart').disabled=true;$('btnStop').disabled=false;$('btnScan').disabled=false;$('btnFinish').disabled=!isRecording;
   status('工作中','准快平衡：顶部单号2次同号快速锁定，低可信候选继续复核。当前：'+qualityProfile().label);
   log('开始工作：准快平衡模式已启动，又快又准｜'+qualityProfile().label,'ok');
@@ -553,26 +601,64 @@ function preprocess(c){
   const out=document.createElement('canvas');const scale=Math.min(3,Math.max(1.6,900/Math.max(c.width,c.height)));out.width=Math.round(c.width*scale);out.height=Math.round(c.height*scale);const ctx=out.getContext('2d');ctx.drawImage(c,0,0,out.width,out.height);const img=ctx.getImageData(0,0,out.width,out.height);const d=img.data;for(let i=0;i<d.length;i+=4){let v=(d[i]*.299+d[i+1]*.587+d[i+2]*.114);v=(v-128)*1.45+128;v=v>145?255:(v<90?0:v);d[i]=d[i+1]=d[i+2]=v}ctx.putImageData(img,0,0);return out}
 function rotateCanvas(c,deg){if(!deg)return c;const r=document.createElement('canvas'),ctx=r.getContext('2d');const rad=deg*Math.PI/180;if(Math.abs(deg)%180===90){r.width=c.height;r.height=c.width}else{r.width=c.width;r.height=c.height}ctx.translate(r.width/2,r.height/2);ctx.rotate(rad);ctx.drawImage(c,-c.width/2,-c.height/2);return r}
 
+
+function preprocessBarcode(c, mode='contrast'){
+  const out=document.createElement('canvas');
+  const scale=Math.min(3,Math.max(1.4,900/Math.max(c.width,c.height)));
+  out.width=Math.max(1,Math.round(c.width*scale));
+  out.height=Math.max(1,Math.round(c.height*scale));
+  const ctx=out.getContext('2d',{willReadFrequently:true});
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(c,0,0,out.width,out.height);
+  const img=ctx.getImageData(0,0,out.width,out.height), d=img.data;
+  for(let i=0;i<d.length;i+=4){
+    let v=d[i]*.299+d[i+1]*.587+d[i+2]*.114;
+    if(mode==='gray'){
+      v=(v-128)*1.35+128;
+    }else if(mode==='invert'){
+      v=255-((v-128)*1.8+128);
+      v=v>145?255:(v<115?0:v);
+    }else{
+      v=(v-128)*1.95+128;
+      v=v>148?255:(v<112?0:v);
+    }
+    d[i]=d[i+1]=d[i+2]=Math.max(0,Math.min(255,v));
+  }
+  ctx.putImageData(img,0,0);
+  return out;
+}
+function barcodeVariants(c){
+  const m=barcodeMode();
+  const arr=[{canvas:c,mode:'原图'}];
+  if(m==='auto'){
+    arr.push({canvas:preprocessBarcode(c,'gray'),mode:'灰度增强'});
+    arr.push({canvas:preprocessBarcode(c,'contrast'),mode:'黑白高对比'});
+    arr.push({canvas:preprocessBarcode(c,'invert'),mode:'反色增强'});
+  }else{
+    arr.push({canvas:preprocessBarcode(c,m),mode:m==='contrast'?'黑白高对比':m==='invert'?'反色增强':'灰度增强'});
+  }
+  return arr;
+}
 async function detectBarcodesFromCanvas(c){
   const results=[];
-  // 1) 浏览器原生 BarcodeDetector
-  if(barcodeDetector){
-    try{
-      const arr=await barcodeDetector.detect(c);
-      for(const b of arr||[]) results.push({raw:String(b.rawValue||''),engine:'native'});
-    }catch(e){}
-  }
-  // 2) ZXing兜底：更接近真正扫码枪的条码解码逻辑，对Code128更友好
-  if(zxingReader){
-    for(const img of [c, preprocess(c)]){
+  const variants=barcodeVariants(c);
+  for(const v of variants){
+    // 1) 浏览器原生 BarcodeDetector
+    if(barcodeDetector){
       try{
-        const r=await zxingReader.decodeFromCanvas(img);
+        const arr=await barcodeDetector.detect(v.canvas);
+        for(const b of arr||[]) results.push({raw:String(b.rawValue||''),engine:'native-'+v.mode});
+      }catch(e){}
+    }
+    // 2) ZXing兜底：更接近扫码枪解码，对 Code128 / Code39 更友好
+    if(zxingReader){
+      try{
+        const r=await zxingReader.decodeFromCanvas(v.canvas);
         const raw=String((r&&r.getText?r.getText():r&&r.text)||'');
-        if(raw) results.push({raw,engine:'zxing'});
+        if(raw) results.push({raw,engine:'zxing-'+v.mode});
       }catch(e){}
     }
   }
-  // 去重
   const seen=new Set();
   return results.filter(x=>{const k=x.engine+'|'+x.raw; if(seen.has(k)) return false; seen.add(k); return true;});
 }
@@ -591,15 +677,15 @@ async function phoneScannerScan(src,zones){
         const arr=await detectBarcodesFromCanvas(c);
         for(const b of arr){
           const raw=String(b.raw||'');
-          const n=norm(raw);
-          updateScanInfo({stage:'条码扫描',barcode:raw||'-',reason:valid(n)?'条码解码成功，准备校验':'扫到条码内容但不是13位面单号：'+(raw||'-')});
-          if(valid(n)){
-            // 防止同一面单在镜头里每帧都刷日志
+          const nums=rememberBarcode(raw,'手机扫码枪:'+z.name+':'+b.engine);
+          updateScanInfo({stage:'条码扫描',barcode:raw||'-',reason:nums.length?'条码已提取候选：'+nums.map(x=>x.num).join('/'):'扫到条码，但未提取到13位快递单号：'+(raw||'-')});
+          if(nums.length){
+            const n=nums[0].num;
             if(n!==work.lastPhoneScanNo || now-work.lastPhoneScanAt>2500){
-              log('手机扫码枪扫到：'+n+'｜'+z.name+'｜'+b.engine,'ok');
+              log('条码候选：'+n+'｜'+z.name+'｜'+b.engine+'｜raw='+raw,'ok');
               work.lastPhoneScanNo=n; work.lastPhoneScanAt=now;
             }
-            out.push({num:n,src:'条码:手机扫码枪:'+z.name+':'+b.engine});
+            out.push(...nums);
             return out;
           }
         }
@@ -631,7 +717,7 @@ async function localBarcode(zones){
   const out=[];
   for(const z of zones.slice(0,5)){
     for(const deg of [0,90,-90,180]){
-      try{const c=rotateCanvas(z.canvas,deg);const arr=await detectBarcodesFromCanvas(c);for(const b of arr){const raw=String(b.raw||'');const n=norm(raw);updateScanInfo({stage:'条码扫描',barcode:raw||'-',reason:valid(n)?'条码有效':'条码内容无效或非面单号'});if(valid(n))out.push({num:n,src:'条码:'+z.name+':'+b.engine})}}catch(e){}
+      try{const c=rotateCanvas(z.canvas,deg);const arr=await detectBarcodesFromCanvas(c);for(const b of arr){const raw=String(b.raw||'');const nums=rememberBarcode(raw,'条码:'+z.name+':'+b.engine);updateScanInfo({stage:'条码扫描',barcode:raw||'-',reason:nums.length?'条码候选：'+nums.map(x=>x.num).join('/'):'条码内容未提取到13位单号'});out.push(...nums)}}catch(e){}
       if(out.length) return out;
     }
   }
@@ -705,6 +791,9 @@ function rememberOcr(nums, src){
     if(now-rec.last>450){ rec.count++; rec.last=now; }
     rec.srcs.add(src);
     out.push({num:n,src:'OCR:'+src+':'+rec.count+'/'+OCR_CONFIRM_NEED});
+    if(hasBarcodeConfirm(n)){
+      out.push({num:n,src:'条码互证:'+barcodeConfirmText(n)});
+    }
   });
   return out;
 }
@@ -723,7 +812,7 @@ async function localOCR(zones){
     const text=await recognizeFastCanvas(img);
     const nums=numsFromText(text);
     if(nums.length){
-      updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR准快识别',ocr:nums.join('/'),reason:name+' 候选：'+nums.join('/')});
+      updateScanInfo({stage:isRecording?'低频扫描下一单':'OCR条码互证',ocr:nums.join('/'),reason:name+' 候选：'+nums.join('/')+(nums.some(hasBarcodeConfirm)?'｜条码一致':'')});
       const items=rememberOcr(nums,name);
       lastOcrCandidate=nums[0]; lastOcrAt=Date.now();
       return items;
@@ -777,21 +866,24 @@ function ocrStable(items){
     const hasRight=srcs.some(s=>s.includes('右侧'));
     const hasEdge=srcs.some(s=>s.includes('边缘'));
     const multiRegion=hasTop && (hasRight || hasEdge);
+    const barcodeOK=hasBarcodeConfirm(n);
 
-    // V32 准快平衡：
-    // 1) 顶部 + 右侧/边缘同号：2次直接锁定，最快也较准；
-    // 2) 顶部高可信区域单独连续2次：锁定；
-    // 3) 只有右侧竖排：连续2次锁定；
-    // 4) 只有边缘兜底：连续3次才锁定，防止误绑。
+    // V34 条码+OCR互证：
+    // 1) OCR候选和条码候选一致：最快通过；
+    // 2) 顶部+右侧/边缘同号：快速通过；
+    // 3) 顶部高可信区域单独2次：通过；
+    // 4) 只有边缘兜底：3次才通过。
     let need=OCR_CONFIRM_NEED;
     let mode='OCR多帧稳定';
-    if(multiRegion){ need=2; mode='OCR多区域一致'; }
+    if(barcodeOK && rec.count>=1){ need=1; mode='条码+OCR互证'; }
+    else if(multiRegion){ need=2; mode='OCR多区域一致'; }
     else if(hasTop){ need=2; mode='OCR顶部高可信'; }
     else if(hasRight){ need=2; mode='OCR右侧稳定'; }
     else if(hasEdge){ need=EDGE_CONFIRM_NEED; mode='OCR边缘严格'; }
 
     if(rec.count>=need){
-      return {num:n,src:'OCR准快锁定 '+rec.count+'/'+need+'｜'+srcs.join('+'),engines:mode};
+      const extra=barcodeOK?'｜'+barcodeConfirmText(n):'';
+      return {num:n,src:'OCR条码锁定 '+rec.count+'/'+need+'｜'+srcs.join('+')+extra,engines:mode};
     }
   }
   return null;
@@ -860,7 +952,7 @@ async function scanLoop(force=false){
   work.busy=true;
   try{
     const q=qualityProfile(); const src=capture(isRecording?q.ocrRec:q.ocrIdle); if(!src) return;
-    updateScanInfo({stage:isRecording?'录制中低频扫描':'OCR极速识别',reason:isRecording?'录制中自动降频，避免卡顿':'OCR准快识别中：顶部2次同号快速锁定，侧边/边缘需更严格确认'});
+    updateScanInfo({stage:isRecording?'录制中低频扫描':'OCR极速识别',reason:isRecording?'录制中自动降频，避免卡顿':'OCR+条码互证中：条码候选会用于校验OCR单号'});
     const scanZone={name:'扫码框区域',canvas:crop(src,scanBoxRegion(src))};
     const box=findLabel(src); const label=crop(src,box); const zones=[scanZone,...makeZones(label)];
     work.loopCount=(work.loopCount||0)+1;
@@ -887,7 +979,7 @@ async function scanLoop(force=false){
       $('detectedNo').textContent=hit.num;
       $('sourceText').textContent=hit.src;
       status(isRecording?'检测到下一单':'OCR确认通过', hit.num+'｜'+(hit.engines||hit.src));
-      updateScanInfo({stage:'校验成功',confirm:'通过',reason:'OCR准快锁定：'+(hit.engines||hit.src),force:true});
+      updateScanInfo({stage:'校验成功',confirm:'通过',reason:'OCR条码锁定：'+(hit.engines||hit.src),force:true});
       pulse();
       if(hit.num!==recordingNo && work.lastSuccessSpoken!==hit.num){speak('success');work.lastSuccessSpoken=hit.num}
       await handleWaybill(hit.num);
@@ -969,7 +1061,7 @@ setupAuthUI();
 setupScanner();
 refreshScannerButton();
 updateScanEffect();
-log('V33已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
+log('V34已加载：真条码扫描+信息显示。固定扫码框会裁剪、增强、多帧解码；下方实时显示条码/OCR/AI候选。');
 </script>
 </body>
 </html>
