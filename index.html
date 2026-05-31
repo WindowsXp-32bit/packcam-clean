@@ -4,121 +4,118 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#050816">
-<title>PackCam V1 APK模式取证版</title>
+<title>PackCam Clean V2 十帧OCR取证版</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://unpkg.com/@zxing/browser@latest/umd/index.min.js"></script>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050816;color:#e8eefc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",Arial,sans-serif}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050816;color:#eef4ff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif}
 button,input,select{font:inherit}
-#app{position:fixed;inset:0;display:grid;grid-template-rows:1fr auto;background:#050816}
-.videoWrap{position:relative;overflow:hidden;background:#000}
-video#camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
-.topbar{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 8px);z-index:20;display:flex;gap:8px;align-items:center;justify-content:space-between;pointer-events:none}
-.pill{pointer-events:auto;border:1px solid rgba(255,255,255,.18);background:rgba(6,12,30,.70);backdrop-filter:blur(12px);border-radius:999px;padding:7px 10px;box-shadow:0 8px 25px rgba(0,0,0,.28);font-size:12px;line-height:1.15}
-.pill b{color:#7dd3fc}
-#recPill.recording{background:rgba(185,28,28,.78);border-color:rgba(255,255,255,.2);animation:pulse 1.1s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
-.roiGuide{position:absolute;left:6%;right:6%;top:10%;height:28%;border:2px solid rgba(34,197,94,.75);border-radius:18px;z-index:4;box-shadow:0 0 0 999px rgba(0,0,0,.10) inset;pointer-events:none}
-.roiGuide:before{content:"把顶部条码和下方13位单号放在这里";position:absolute;left:10px;top:-28px;background:rgba(22,163,74,.85);padding:5px 8px;border-radius:999px;font-size:12px}
-.flash{position:absolute;inset:0;background:rgba(34,197,94,.22);z-index:10;opacity:0;pointer-events:none}
-.flash.show{animation:flash .35s}
-@keyframes flash{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
-.controls{position:absolute;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);z-index:30;display:grid;gap:8px;pointer-events:none}
-.btnRow{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:8px;pointer-events:auto}
-button{border:0;border-radius:15px;padding:12px 10px;background:#172033;color:#e8eefc;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+button{border:0;border-radius:14px;padding:12px 10px;background:#172033;color:#eef4ff;font-weight:800;box-shadow:0 8px 22px rgba(0,0,0,.25)}
 button.primary{background:linear-gradient(135deg,#2563eb,#06b6d4)}
 button.good{background:linear-gradient(135deg,#16a34a,#22c55e);color:#04130a}
-button.warn{background:linear-gradient(135deg,#f97316,#facc15);color:#1f1300}
+button.warn{background:linear-gradient(135deg,#f97316,#facc15);color:#1e1300}
 button.danger{background:linear-gradient(135deg,#dc2626,#fb7185)}
-button:disabled{opacity:.45;filter:grayscale(.4)}
-.statusPanel{pointer-events:auto;border:1px solid rgba(255,255,255,.14);background:rgba(5,10,26,.78);backdrop-filter:blur(14px);border-radius:18px;padding:8px;max-height:34vh;overflow:hidden}
-.statusGrid{display:grid;grid-template-columns:54px 1fr;gap:4px 8px;font-size:12px;line-height:1.28}
-.statusGrid b{color:#93c5fd}
-.statusGrid span{word-break:break-all;color:#dbeafe}
-#dataLine{max-height:76px;overflow:hidden;color:#bbf7d0}
-#reason{color:#fde68a}
-.bottomSheet{display:none;position:absolute;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);z-index:45;background:rgba(5,10,26,.94);border:1px solid rgba(255,255,255,.16);border-radius:20px;padding:12px;box-shadow:0 10px 40px rgba(0,0,0,.45);max-height:70vh;overflow:auto}
-.bottomSheet.show{display:block}
-.sheetHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+button:disabled{opacity:.45}
+#app{position:fixed;inset:0;background:#000;overflow:hidden}
+#camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#guide{position:absolute;left:6%;right:6%;top:10%;height:25%;border:2px solid rgba(34,197,94,.9);border-radius:18px;pointer-events:none;z-index:4;box-shadow:0 0 0 999px rgba(0,0,0,.05) inset}
+#guide:before{content:"顶部条码 + 下方13位单号放这里";position:absolute;left:8px;top:-28px;background:rgba(22,163,74,.9);border-radius:999px;padding:5px 9px;font-size:12px}
+.topMini{position:absolute;left:8px;right:8px;top:calc(env(safe-area-inset-top) + 8px);z-index:20;display:flex;gap:8px;justify-content:space-between;pointer-events:none}
+.pill{pointer-events:auto;max-width:48%;border:1px solid rgba(255,255,255,.16);background:rgba(5,10,26,.74);backdrop-filter:blur(12px);border-radius:999px;padding:7px 10px;font-size:12px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#recPill.recording{background:rgba(185,28,28,.82);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.flash{position:absolute;inset:0;background:rgba(34,197,94,.22);opacity:0;z-index:12;pointer-events:none}
+.flash.show{animation:flash .35s}
+@keyframes flash{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+.bottomBar{position:absolute;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);z-index:30;display:grid;gap:8px;pointer-events:none}
+.dataStrip{pointer-events:auto;border:1px solid rgba(255,255,255,.14);background:rgba(5,10,26,.72);backdrop-filter:blur(12px);border-radius:16px;padding:7px 9px;font-size:12px;line-height:1.25;max-height:52px;overflow:hidden}
+.dataStrip b{color:#93c5fd}
+#dataText{color:#bbf7d0;word-break:break-all}
+.btns{pointer-events:auto;display:grid;grid-template-columns:1.2fr .85fr .85fr .85fr .85fr;gap:7px}
+.sheet{display:none;position:absolute;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);z-index:50;max-height:74vh;overflow:auto;background:rgba(5,10,26,.96);border:1px solid rgba(255,255,255,.16);border-radius:20px;padding:12px;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+.sheet.show{display:block}
+.sheetHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .sheetHead h3{margin:0;font-size:16px}
 .form{display:grid;gap:9px}
-.form input,.form select{width:100%;border:1px solid rgba(255,255,255,.18);background:#0b1224;color:#e8eefc;border-radius:12px;padding:11px}
-.form label{font-size:12px;color:#93a4bd;margin-top:4px}
-.results{display:grid;gap:10px;margin-top:10px}
+.form label{font-size:12px;color:#93a4bd}
+.form input,.form select{width:100%;border:1px solid rgba(255,255,255,.16);background:#0b1224;color:#eef4ff;border-radius:12px;padding:11px}
+.small{font-size:12px;color:#93a4bd;line-height:1.35}
+.statusGrid{display:grid;grid-template-columns:64px 1fr;gap:5px 8px;font-size:12px;line-height:1.3}
+.statusGrid b{color:#93c5fd}
+.statusGrid span{word-break:break-all}
+.records{display:grid;gap:10px}
 .record{border:1px solid rgba(255,255,255,.14);background:#0b1224;border-radius:14px;padding:10px}
 .record video{width:100%;border-radius:12px;background:#000;margin-top:8px}
-.mini{font-size:12px;color:#93a4bd;line-height:1.35}
-.hidden{display:none!important}
-.footerLog{height:0;overflow:hidden}
-@media (orientation:landscape){
-  .btnRow{grid-template-columns:1.2fr .8fr .8fr .8fr .8fr}
-  .statusPanel{max-height:36vh}
-  .roiGuide{left:15%;right:15%;top:8%;height:32%}
+@media(max-width:430px){
+  .btns{grid-template-columns:1.2fr .9fr .9fr .9fr}
+  #btnPanel{grid-column:1/-1}
+  button{padding:11px 8px;font-size:14px}
+  #guide{top:12%;height:24%}
+}
+@media(orientation:landscape){
+  #guide{left:18%;right:18%;top:8%;height:30%}
+  .bottomBar{left:12px;right:12px}
+  .dataStrip{max-height:42px}
 }
 </style>
 </head>
 <body>
 <div id="app">
-  <div class="videoWrap">
-    <video id="camera" autoplay playsinline muted></video>
-    <div class="roiGuide" id="roiGuide"></div>
-    <div class="flash" id="flash"></div>
+  <video id="camera" autoplay playsinline muted></video>
+  <div id="guide"></div>
+  <div id="flash" class="flash"></div>
+  <div class="topMini">
+    <div class="pill" id="statePill">待机</div>
+    <div class="pill" id="recPill">未录制</div>
+  </div>
 
-    <div class="topbar">
-      <div class="pill" id="statePill">未开始</div>
-      <div class="pill" id="recPill">未录制</div>
+  <div class="bottomBar">
+    <div class="dataStrip"><b id="stageText">阶段</b>：<span id="dataText">点击开始工作</span></div>
+    <div class="btns">
+      <button id="btnStart" class="primary">开始工作</button>
+      <button id="btnRescan">补扫10帧</button>
+      <button id="btnFinish" class="warn" disabled>完成</button>
+      <button id="btnStop" class="danger" disabled>停止</button>
+      <button id="btnPanel" class="good">查询/设置</button>
     </div>
+  </div>
 
-    <div class="controls">
-      <div class="statusPanel">
-        <div class="statusGrid">
-          <b>阶段</b><span id="stage">待机</span>
-          <b>单号</b><span id="detected">-</span>
-          <b>条码</b><span id="barcode">-</span>
-          <b>OCR</b><span id="ocr">-</span>
-          <b>数据</b><span id="dataLine">-</span>
-          <b>状态</b><span id="reason">等待开始工作</span>
-        </div>
+  <div id="sheet" class="sheet">
+    <div class="sheetHead"><h3>查询 / 设置 / 状态</h3><button id="btnClose">关闭</button></div>
+    <div class="form">
+      <div class="statusGrid">
+        <b>当前单号</b><span id="curNo">-</span>
+        <b>OCR候选</b><span id="ocrText">-</span>
+        <b>条码候选</b><span id="barText">-</span>
+        <b>识别数据</b><span id="fullData">-</span>
       </div>
-      <div class="btnRow">
-        <button id="btnStart" class="primary">开始工作</button>
-        <button id="btnRescan">补扫</button>
-        <button id="btnFinish" class="warn" disabled>完成</button>
-        <button id="btnStop" class="danger" disabled>停止</button>
-        <button id="btnPanel" class="good">查询/设置</button>
-      </div>
-    </div>
 
-    <div class="bottomSheet" id="panel">
-      <div class="sheetHead"><h3>查询 / 设置</h3><button id="btnClosePanel">关闭</button></div>
-      <div class="form">
-        <label>手动输入/纠正单号（最高优先级）</label>
-        <input id="manualNo" inputmode="numeric" placeholder="输入13位快递单号">
-        <button id="btnManual" class="good">用这个单号开始/切换录制</button>
+      <label>手动输入/纠正单号（最高优先级）</label>
+      <input id="manualNo" inputmode="numeric" placeholder="输入13位快递单号">
+      <button id="btnManual" class="good">用这个单号开始/切换录制</button>
 
-        <label>按单号查询视频</label>
-        <input id="searchNo" inputmode="numeric" placeholder="输入13位快递单号查询">
-        <button id="btnSearch" class="primary">查询最新视频</button>
+      <label>查询视频</label>
+      <input id="searchNo" inputmode="numeric" placeholder="输入13位快递单号查询">
+      <button id="btnSearch" class="primary">查询最新视频</button>
 
-        <label>画质/性能模式</label>
-        <select id="quality">
-          <option value="smart" selected>智能：1080p识别 + 录制中降频</option>
-          <option value="stable">稳定：720p低码率，长时间更稳</option>
-          <option value="clear">高清：1080p高码率，识别优先</option>
-        </select>
+      <label>画质/性能</label>
+      <select id="quality">
+        <option value="smart" selected>智能1080p：推荐</option>
+        <option value="stable">稳定720p：低发热</option>
+        <option value="clear">高清1080p：识别优先</option>
+      </select>
 
-        <label>识别策略</label>
-        <select id="strategy">
-          <option value="balanced" selected>准快平衡：顶部OCR两帧或条码+OCR通过</option>
-          <option value="strict">严格：优先条码+OCR或顶部+右侧校验</option>
-          <option value="fast">极速：顶部OCR一帧+复扫确认</option>
-        </select>
+      <label>识别严格度</label>
+      <select id="strict">
+        <option value="balanced" selected>准快：OCR两帧一致 或 OCR+条码一致</option>
+        <option value="strict">严格：优先 OCR+条码</option>
+        <option value="fast">极速：OCR一帧候选后快速复扫</option>
+      </select>
 
-        <button id="btnSaveCfg">保存设置</button>
-        <div class="mini">V1 APK模式：重新开始，砍掉多余复杂逻辑。顶部条码下方单号是主识别；条码解码是强校验；右侧竖排只做辅助，不再让它拖死流程。</div>
-        <div class="results" id="results"></div>
-      </div>
+      <button id="btnSaveCfg">保存设置</button>
+      <div class="small">V2：每轮抓取前10帧做图片文字识别，优先选择清晰帧，识别到即提前停止。UI只保留顶部小状态和底部一行数据，不再大面积遮挡画面。真人语音包继续保留。</div>
+      <div id="records" class="records"></div>
     </div>
   </div>
 </div>
@@ -126,553 +123,369 @@ button:disabled{opacity:.45;filter:grayscale(.4)}
 <script>
 'use strict';
 
-const $ = id => document.getElementById(id);
-const video = $('camera');
-
-const S = {
-  active:false, busy:false, stream:null, track:null, facing:'environment',
-  wake:null, scanTimer:null, recording:false, recorder:null, chunks:[],
-  recNo:null, recStart:0, loop:0, candidates:{}, barcodeHits:{}, lastOcrAt:0,
-  data:[], objectUrls:[], saved:0, quick:false, db:null, lastSpeak:''
+const $=id=>document.getElementById(id);
+const video=$('camera');
+const S={
+  active:false,busy:false,stream:null,track:null,wake:null,timer:null,
+  recording:false,recorder:null,chunks:[],recNo:null,recStart:0,
+  candidates:{},data:[],urls:[],loop:0,lastSpeak:'',facing:'environment'
 };
+let ocrWorker=null,ocrReady=false,ocrInit=null,barcodeDetector=null,zxingReader=null;
 
-const CFG = {
-  TTL: 2600,
-  scanIdle: 260,
-  scanRec: 1200,
-  quickDelay: 70,
-  maxRecordMs: 8*60*1000
+const audio={
+  start:new Audio('audio/start.mp3'),
+  complete:new Audio('audio/complete.mp3'),
+  success:new Audio('audio/success.mp3'),
+  fail:new Audio('audio/fail.mp3')
 };
+Object.values(audio).forEach(a=>{a.preload='auto';a.volume=1});
 
-let ocrWorker=null, ocrReady=false, ocrInitPromise=null;
-let barcodeDetector=null, zxingReader=null;
-
-function norm(s){ return String(s||'').replace(/\D/g,''); }
+function norm(s){return String(s||'').replace(/\D/g,'')}
 function validNo(n){
   n=norm(n);
   if(!/^\d{13}$/.test(n)) return false;
   if(/^(\d)\1+$/.test(n)) return false;
-  if(n.startsWith('2024')||n.startsWith('2025')||n.startsWith('2026')) return false;
+  if(/202[0-9]/.test(n)) return false;
   return true;
 }
-function setText(id,t){ const el=$(id); if(el) el.textContent = t || '-'; }
-function setStage(a,b=''){
-  setText('stage',a); setText('reason',b); setText('statePill',a + (b?'｜'+b:''));
-}
+function set(id,t){const e=$(id);if(e)e.textContent=t||'-'}
+function setStage(stage,msg=''){set('stageText',stage);set('statePill',stage); if(msg)addData('状态',msg)}
 function addData(type,val,tag=''){
-  val=String(val||'').replace(/\s+/g,' ').trim();
-  if(!val) return;
+  val=String(val||'').replace(/\s+/g,' ').trim(); if(!val)return;
   const t=new Date().toLocaleTimeString('zh-CN',{hour12:false});
-  const line=`${t} ${type}：${val}${tag?'｜'+tag:''}`;
-  if(S.data[0]!==line) S.data.unshift(line);
-  S.data=S.data.slice(0,8);
-  setText('dataLine',S.data.join(' / '));
+  const line=`${t} ${type}:${val}${tag?'｜'+tag:''}`;
+  if(S.data[0]!==line)S.data.unshift(line);
+  S.data=S.data.slice(0,10);
+  set('dataText',S.data.slice(0,3).join(' / '));
+  set('fullData',S.data.join(' / '));
 }
-function pulse(){ const f=$('flash'); f.classList.remove('show'); void f.offsetWidth; f.classList.add('show'); }
-function beep(kind='ok'){
-  if(!S.active && kind!=='test') return;
+function setCurrentNo(n){set('curNo',n);set('recPill',S.recording?'录制中 '+n:'未录制')}
+function flash(){const f=$('flash');f.classList.remove('show');void f.offsetWidth;f.classList.add('show')}
+function speak(k){
+  if(!S.active&&k!=='test')return;
+  const a=audio[k]; 
+  if(a){try{a.pause();a.currentTime=0;a.play().catch(()=>fallbackBeep(k));return}catch(e){}}
+  fallbackBeep(k);
+}
+function fallbackBeep(k){
   try{
-    const ctx=new (window.AudioContext||window.webkitAudioContext)();
-    const o=ctx.createOscillator(), g=ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.frequency.value = kind==='bad'?220:(kind==='done'?660:880);
-    g.gain.value=.08; o.start();
-    setTimeout(()=>{o.stop();ctx.close()}, kind==='bad'?220:130);
-    if(navigator.vibrate) navigator.vibrate(kind==='bad'?[80,40,80]:[50]);
+    const ctx=new (window.AudioContext||window.webkitAudioContext)(),o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);o.frequency.value=k==='fail'?220:k==='complete'?660:880;g.gain.value=.08;o.start();
+    setTimeout(()=>{o.stop();ctx.close()},k==='fail'?230:140);
   }catch(e){}
 }
-function say(text){
-  if(!S.active || !window.speechSynthesis) return;
-  if(S.lastSpeak===text) return;
-  S.lastSpeak=text;
-  try{ const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=1.25; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){}
+function quality(){
+  const q=$('quality').value||localStorage.getItem('pc_v2_quality')||'smart';
+  if(q==='stable')return{w:1280,h:720,cap:980,bitrate:1400000,label:'稳定720p'};
+  if(q==='clear')return{w:1920,h:1080,cap:1550,bitrate:2400000,label:'高清1080p'};
+  return{w:1920,h:1080,cap:1350,bitrate:1800000,label:'智能1080p'};
 }
-function qualityProfile(){
-  const q=$('quality')?.value || localStorage.getItem('packcam_v1_quality') || 'smart';
-  if(q==='stable') return {w:1280,h:720,bitrate:1400000,cap:1050,label:'稳定720p'};
-  if(q==='clear') return {w:1920,h:1080,bitrate:2400000,cap:1500,label:'高清1080p'};
-  return {w:1920,h:1080,bitrate:1800000,cap:1350,label:'智能1080p'};
-}
-function strategy(){ return $('strategy')?.value || localStorage.getItem('packcam_v1_strategy') || 'balanced'; }
+function strictMode(){return $('strict').value||localStorage.getItem('pc_v2_strict')||'balanced'}
 
-async function keepAwake(){
-  try{ if('wakeLock' in navigator) S.wake = await navigator.wakeLock.request('screen'); }catch(e){}
-}
-function releaseAwake(){ try{S.wake&&S.wake.release()}catch(e){} S.wake=null; }
-
+async function unlockAudio(){for(const a of Object.values(audio)){try{a.muted=true;await a.play();a.pause();a.currentTime=0;a.muted=false}catch(e){}}}
 async function startCamera(){
-  if(S.stream) return;
-  const q=qualityProfile();
+  if(S.stream)return;
+  const q=quality();
   try{
-    S.stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:S.facing},width:{ideal:q.w},height:{ideal:q.h},focusMode:'continuous',advanced:[{focusMode:'continuous'}]},
-      audio:false
-    });
+    S.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:S.facing},width:{ideal:q.w},height:{ideal:q.h},focusMode:'continuous'},audio:false});
   }catch(e){
     S.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:S.facing,width:{ideal:1280},height:{ideal:720}},audio:false});
   }
-  video.srcObject=S.stream;
-  S.track=S.stream.getVideoTracks()[0];
-  await video.play();
-  try{ barcodeDetector = new BarcodeDetector({formats:['code_128','code_39','ean_13','qr_code','data_matrix']}); }catch(e){ barcodeDetector=null; }
-  try{
-    if(window.ZXingBrowser && ZXingBrowser.BrowserMultiFormatReader) zxingReader=new ZXingBrowser.BrowserMultiFormatReader();
-  }catch(e){ zxingReader=null; }
+  video.srcObject=S.stream;S.track=S.stream.getVideoTracks()[0];await video.play();
+  try{barcodeDetector=new BarcodeDetector({formats:['code_128','code_39','ean_13','qr_code','data_matrix']})}catch(e){barcodeDetector=null}
+  try{if(window.ZXingBrowser&&ZXingBrowser.BrowserMultiFormatReader)zxingReader=new ZXingBrowser.BrowserMultiFormatReader()}catch(e){zxingReader=null}
 }
-function stopCamera(){
-  if(S.stream){ S.stream.getTracks().forEach(t=>t.stop()); }
-  S.stream=null; S.track=null; video.srcObject=null;
-}
+function stopCamera(){if(S.stream)S.stream.getTracks().forEach(t=>t.stop());S.stream=null;video.srcObject=null}
+async function wake(){try{if('wakeLock'in navigator)S.wake=await navigator.wakeLock.request('screen')}catch(e){}}
+function releaseWake(){try{S.wake&&S.wake.release()}catch(e){}S.wake=null}
 async function ensureOCR(){
-  if(ocrReady && ocrWorker) return true;
-  if(ocrInitPromise) return ocrInitPromise;
-  if(!window.Tesseract){ setStage('OCR库未加载','请检查网络/CDN'); return false; }
-  ocrInitPromise=(async()=>{
+  if(ocrReady&&ocrWorker)return true;
+  if(ocrInit)return ocrInit;
+  if(!window.Tesseract){addData('识别异常','Tesseract库未加载');return false}
+  ocrInit=(async()=>{
     try{
-      setStage('OCR初始化','首次加载会慢，后面会快');
-      try{ ocrWorker=await Tesseract.createWorker('eng'); }
+      setStage('OCR初始化','首次加载后会缓存');
+      try{ocrWorker=await Tesseract.createWorker('eng')}
       catch(e){
         ocrWorker=await Tesseract.createWorker();
-        if(ocrWorker.loadLanguage) await ocrWorker.loadLanguage('eng');
-        if(ocrWorker.initialize) await ocrWorker.initialize('eng');
+        if(ocrWorker.loadLanguage)await ocrWorker.loadLanguage('eng');
+        if(ocrWorker.initialize)await ocrWorker.initialize('eng');
       }
-      if(ocrWorker.setParameters){
-        await ocrWorker.setParameters({
-          tessedit_char_whitelist:'0123456789',
-          preserve_interword_spaces:'0',
-          user_defined_dpi:'220'
-        });
-      }
-      ocrReady=true;
-      addData('系统','OCR就绪');
-      return true;
-    }catch(e){ addData('OCR初始化失败',e.message); return false; }
+      if(ocrWorker.setParameters)await ocrWorker.setParameters({
+        tessedit_char_whitelist:'0123456789',
+        preserve_interword_spaces:'0',
+        user_defined_dpi:'220'
+      });
+      ocrReady=true;addData('系统','OCR就绪');return true;
+    }catch(e){addData('识别异常',e.message);return false}
   })();
-  return ocrInitPromise;
+  return ocrInit;
 }
 
 function capture(maxW){
-  if(!video.videoWidth) return null;
-  const scale=Math.min(1, maxW/video.videoWidth);
-  const c=document.createElement('canvas');
-  c.width=Math.max(1,Math.round(video.videoWidth*scale));
-  c.height=Math.max(1,Math.round(video.videoHeight*scale));
+  if(!video.videoWidth)return null;
+  const scale=Math.min(1,maxW/video.videoWidth),c=document.createElement('canvas');
+  c.width=Math.round(video.videoWidth*scale);c.height=Math.round(video.videoHeight*scale);
   c.getContext('2d',{willReadFrequently:true}).drawImage(video,0,0,c.width,c.height);
-  return {canvas:c,w:c.width,h:c.height};
+  return{canvas:c,w:c.width,h:c.height};
 }
 function crop(src,b){
-  const c=document.createElement('canvas');
-  const x=Math.max(0,Math.round(b.x)), y=Math.max(0,Math.round(b.y));
-  const w=Math.max(1,Math.min(src.w-x,Math.round(b.w)));
-  const h=Math.max(1,Math.min(src.h-y,Math.round(b.h)));
-  c.width=w; c.height=h;
+  const x=Math.max(0,Math.round(b.x)),y=Math.max(0,Math.round(b.y));
+  const w=Math.max(1,Math.min(src.w-x,Math.round(b.w))),h=Math.max(1,Math.min(src.h-y,Math.round(b.h)));
+  const c=document.createElement('canvas');c.width=w;c.height=h;
   c.getContext('2d',{willReadFrequently:true}).drawImage(src.canvas,x,y,w,h,0,0,w,h);
   return c;
 }
-function rotateCanvas(c,deg){
-  if(!deg) return c;
-  const r=document.createElement('canvas'), ctx=r.getContext('2d');
+function rotate(c,deg){
+  if(!deg)return c;const r=document.createElement('canvas'),ctx=r.getContext('2d');
   if(Math.abs(deg)%180===90){r.width=c.height;r.height=c.width}else{r.width=c.width;r.height=c.height}
-  ctx.translate(r.width/2,r.height/2); ctx.rotate(deg*Math.PI/180); ctx.drawImage(c,-c.width/2,-c.height/2);
-  return r;
-}
-function flipCanvas(c,flipX=false,flipY=false){
-  if(!flipX&&!flipY) return c;
-  const r=document.createElement('canvas'), ctx=r.getContext('2d');
-  r.width=c.width; r.height=c.height;
-  ctx.translate(flipX?c.width:0, flipY?c.height:0); ctx.scale(flipX?-1:1, flipY?-1:1); ctx.drawImage(c,0,0);
-  return r;
+  ctx.translate(r.width/2,r.height/2);ctx.rotate(deg*Math.PI/180);ctx.drawImage(c,-c.width/2,-c.height/2);return r;
 }
 function findLabel(src){
-  const ctx=src.canvas.getContext('2d',{willReadFrequently:true});
-  const img=ctx.getImageData(0,0,src.w,src.h).data;
-  let minX=src.w,minY=src.h,maxX=0,maxY=0,count=0;
-  const step=10;
-  for(let y=0;y<src.h;y+=step){
-    for(let x=0;x<src.w;x+=step){
-      const i=(y*src.w+x)*4, r=img[i],g=img[i+1],b=img[i+2];
-      const bright=(r+g+b)/3, sat=Math.max(r,g,b)-Math.min(r,g,b);
-      if(bright>145 && sat<80){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);count++;}
-    }
+  const ctx=src.canvas.getContext('2d',{willReadFrequently:true}),d=ctx.getImageData(0,0,src.w,src.h).data;
+  let minX=src.w,minY=src.h,maxX=0,maxY=0,count=0,step=10;
+  for(let y=0;y<src.h;y+=step)for(let x=0;x<src.w;x+=step){
+    const i=(y*src.w+x)*4,r=d[i],g=d[i+1],b=d[i+2],br=(r+g+b)/3,sat=Math.max(r,g,b)-Math.min(r,g,b);
+    if(br>145&&sat<85){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);count++}
   }
-  if(count<80) return {x:src.w*.04,y:src.h*.04,w:src.w*.92,h:src.h*.88};
-  const pad=24;
-  minX=Math.max(0,minX-pad); minY=Math.max(0,minY-pad); maxX=Math.min(src.w,maxX+pad); maxY=Math.min(src.h,maxY+pad);
-  if(maxX-minX<220 || maxY-minY<220) return {x:src.w*.04,y:src.h*.04,w:src.w*.92,h:src.h*.88};
-  return {x:minX,y:minY,w:maxX-minX,h:maxY-minY};
+  if(count<80)return{x:src.w*.04,y:src.h*.04,w:src.w*.92,h:src.h*.88};
+  const pad=26;minX=Math.max(0,minX-pad);minY=Math.max(0,minY-pad);maxX=Math.min(src.w,maxX+pad);maxY=Math.min(src.h,maxY+pad);
+  return{x:minX,y:minY,w:maxX-minX,h:maxY-minY};
 }
-function zonesFromLabel(label){
-  const w=label.width,h=label.height;
-  const z=(name,x,y,ww,hh)=>({name,canvas:crop({canvas:label,w,h},{x:x*w,y:y*h,w:ww*w,h:hh*h})});
-  return {
-    topBarcode:z('顶部条码',.06,.06,.88,.12),
-    topNo:z('顶部条码下方单号',.14,.16,.72,.08),
-    rightBarcode:z('右侧竖条码',.75,.22,.22,.40),
-    rightNo:z('右侧竖排单号',.64,.22,.10,.42),
-    comboTop:z('顶部组合',.04,.04,.92,.23),
-    comboRight:z('右侧组合',.60,.18,.38,.48)
+function getZones(frame){
+  const box=findLabel(frame),label=crop(frame,box),w=label.width,h=label.height;
+  const src={canvas:label,w,h},z=(x,y,ww,hh)=>crop(src,{x:x*w,y:y*h,w:ww*w,h:hh*h});
+  return{
+    topNo:z(.12,.13,.76,.11),
+    topBarcode:z(.06,.04,.88,.13),
+    topCombo:z(.04,.04,.92,.24),
+    rightBarcode:z(.74,.22,.23,.42),
+    rightNo:z(.60,.20,.15,.48)
   };
 }
-function preprocess(c,mode='contrast',maxSide=760){
-  const out=document.createElement('canvas');
-  const scale=Math.min(2.4,Math.max(1.15,maxSide/Math.max(c.width,c.height)));
-  out.width=Math.max(1,Math.round(c.width*scale)); out.height=Math.max(1,Math.round(c.height*scale));
-  const ctx=out.getContext('2d',{willReadFrequently:true});
-  ctx.imageSmoothingEnabled=false; ctx.drawImage(c,0,0,out.width,out.height);
-  const img=ctx.getImageData(0,0,out.width,out.height), d=img.data;
+function sharpness(c){
+  const ctx=c.getContext('2d',{willReadFrequently:true}),w=Math.min(c.width,260),h=Math.min(c.height,80);
+  const tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;tmp.getContext('2d').drawImage(c,0,0,w,h);
+  const d=tmp.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+  let score=0,n=0;
+  for(let y=1;y<h;y+=2)for(let x=1;x<w;x+=2){
+    const i=(y*w+x)*4,l=d[i],lx=d[i-4],ly=d[i-w*4];
+    score+=Math.abs(l-lx)+Math.abs(l-ly);n++;
+  }
+  return n?score/n:0;
+}
+function preprocess(c,mode='contrast',maxSide=900){
+  const out=document.createElement('canvas'),scale=Math.min(2.6,Math.max(1.2,maxSide/Math.max(c.width,c.height)));
+  out.width=Math.max(1,Math.round(c.width*scale));out.height=Math.max(1,Math.round(c.height*scale));
+  const ctx=out.getContext('2d',{willReadFrequently:true});ctx.imageSmoothingEnabled=false;ctx.drawImage(c,0,0,out.width,out.height);
+  const img=ctx.getImageData(0,0,out.width,out.height),d=img.data;
   for(let i=0;i<d.length;i+=4){
     let v=d[i]*.299+d[i+1]*.587+d[i+2]*.114;
-    if(mode==='invert'){ v=255-((v-128)*1.8+128); v=v>145?255:(v<110?0:v); }
-    else if(mode==='gray'){ v=(v-128)*1.45+128; }
-    else { v=(v-128)*1.95+128; v=v>150?255:(v<105?0:v); }
+    if(mode==='invert'){v=255-((v-128)*1.8+128);v=v>145?255:(v<112?0:v)}
+    else if(mode==='gray'){v=(v-128)*1.45+128}
+    else {v=(v-128)*1.95+128;v=v>150?255:(v<105?0:v)}
     d[i]=d[i+1]=d[i+2]=Math.max(0,Math.min(255,v));
   }
-  ctx.putImageData(img,0,0);
-  if(mode==='sharp') sharpen(out);
-  return out;
-}
-function sharpen(c){
-  const ctx=c.getContext('2d',{willReadFrequently:true}), img=ctx.getImageData(0,0,c.width,c.height);
-  const src=new Uint8ClampedArray(img.data), d=img.data, w=c.width,h=c.height;
-  for(let y=1;y<h-1;y++) for(let x=1;x<w-1;x++){
-    const i=(y*w+x)*4; let v=src[i]*5-src[i-4]-src[i+4]-src[i-w*4]-src[i+w*4];
-    v=Math.max(0,Math.min(255,v)); d[i]=d[i+1]=d[i+2]=v;
-  }
-  ctx.putImageData(img,0,0); return c;
+  ctx.putImageData(img,0,0);return out;
 }
 function numsFromText(t){
-  const raw=String(t||'');
-  const out=[];
+  const out=[],raw=String(t||'');
   for(const m of raw.matchAll(/\d[\d\s\-]{10,22}\d/g)){
     const n=norm(m[0]);
-    if(validNo(n)) out.push(n);
-    if(n.length>13){
-      for(let i=0;i<=n.length-13;i++){ const s=n.slice(i,i+13); if(validNo(s)) out.push(s); }
-    }
+    if(validNo(n))out.push(n);
+    if(n.length>13)for(let i=0;i<=n.length-13;i++){const s=n.slice(i,i+13);if(validNo(s))out.push(s)}
   }
-  return [...new Set(out)];
+  return[...new Set(out)];
 }
-function reverseDigits(n){ return String(n||'').split('').reverse().join(''); }
-
-async function ocrCanvas(c,rotate=0,source='OCR'){
-  if(!(await ensureOCR())) return [];
-  const modes = S.recording ? ['contrast','sharp'] : ['contrast','sharp','gray','invert'];
-  const results=[];
-  for(const mode of modes){
-    const img = preprocess(rotateCanvas(c,rotate),mode, S.recording?620:820);
-    try{
-      const r=await ocrWorker.recognize(img);
-      const text=(r&&r.data&&r.data.text)||'';
-      if(text.replace(/\s+/g,'')) addData(source+'原文', text.replace(/\s+/g,'').slice(0,40), mode);
-      const nums=numsFromText(text);
-      if(nums.length){
-        nums.forEach(n=>addData(source+'候选',n,mode));
-        results.push(...nums);
-        if(source.includes('顶部')) break;
-      }
-    }catch(e){ addData('OCR异常',e.message.slice(0,40)); }
-  }
-  return [...new Set(results)];
-}
-function barcodeVariants(c){
-  return [
-    {name:'原图',canvas:c},
-    {name:'高对比',canvas:preprocess(c,'contrast',900)},
-    {name:'锐化',canvas:preprocess(c,'sharp',900)},
-    {name:'反色',canvas:preprocess(c,'invert',900)}
-  ];
-}
-function candidatesFromBarcode(raw){
-  const out=new Set();
-  raw=String(raw||'');
-  const d=raw.replace(/\D/g,'');
-  if(validNo(d) && d.length===13) out.add(d);
-  for(const m of raw.matchAll(/\d{13}/g)){ if(validNo(m[0])) out.add(m[0]); }
-  for(let i=0;i<=d.length-13;i++){ const n=d.slice(i,i+13); if(validNo(n)) out.add(n); }
-  return [...out];
-}
-async function scanBarcode(c,source='条码'){
+async function ocrTop(c,frameNo){
   const out=[];
-  for(const v of barcodeVariants(c)){
+  const modes=['contrast','gray','invert'];
+  for(const mode of modes){
+    try{
+      const img=preprocess(c,mode,900);
+      const r=await ocrWorker.recognize(img);
+      const text=((r&&r.data&&r.data.text)||'').replace(/\s+/g,'');
+      if(text)addData('OCR原文',text.slice(0,40),'帧'+frameNo+' '+mode);
+      const nums=numsFromText(text);
+      if(nums.length){nums.forEach(n=>addData('OCR候选',n,'帧'+frameNo));out.push(...nums);break}
+    }catch(e){addData('识别异常',e.message.slice(0,50))}
+  }
+  return[...new Set(out)];
+}
+function barcodeNums(raw){
+  raw=String(raw||'');const out=new Set(),d=raw.replace(/\D/g,'');
+  if(validNo(d)&&d.length===13)out.add(d);
+  for(const m of raw.matchAll(/\d{13}/g))if(validNo(m[0]))out.add(m[0]);
+  for(let i=0;i<=d.length-13;i++){const s=d.slice(i,i+13);if(validNo(s))out.add(s)}
+  return[...out];
+}
+async function scanBarcode(c,src){
+  const out=[];
+  for(const cv of [c,preprocess(c,'contrast',900),preprocess(c,'invert',900)]){
     if(barcodeDetector){
-      try{
-        const arr=await barcodeDetector.detect(v.canvas);
-        for(const b of arr||[]){
-          const raw=String(b.rawValue||'');
-          addData(source+'raw',raw.slice(0,60),'native '+v.name);
-          const nums=candidatesFromBarcode(raw);
-          nums.forEach(n=>{ addData(source+'候选',n,'native'); out.push(n); });
-        }
-      }catch(e){}
+      try{const arr=await barcodeDetector.detect(cv);for(const b of arr||[]){const raw=String(b.rawValue||'');addData(src+'raw',raw.slice(0,60),'native');barcodeNums(raw).forEach(n=>{addData(src+'候选',n);out.push(n)})}}catch(e){}
     }
     if(zxingReader){
-      try{
-        const r=await zxingReader.decodeFromCanvas(v.canvas);
-        const raw=String((r&&r.getText?r.getText():r&&r.text)||'');
-        if(raw){
-          addData(source+'raw',raw.slice(0,60),'ZXing '+v.name);
-          const nums=candidatesFromBarcode(raw);
-          nums.forEach(n=>{ addData(source+'候选',n,'ZXing'); out.push(n); });
-        }
-      }catch(e){}
+      try{const r=await zxingReader.decodeFromCanvas(cv),raw=String((r&&r.getText?r.getText():r&&r.text)||'');if(raw){addData(src+'raw',raw.slice(0,60),'ZXing');barcodeNums(raw).forEach(n=>{addData(src+'候选',n);out.push(n)})}}catch(e){}
     }
-    if(out.length) break;
+    if(out.length)break;
   }
-  return [...new Set(out)];
+  return[...new Set(out)];
 }
-
-function addCandidate(num,source,weight=1){
-  num=norm(num); if(!validNo(num)) return;
-  const now=Date.now();
-  cleanCaches();
-  const c=S.candidates[num] || {num,score:0,count:0,top:0,right:0,barcode:0,last:0,sources:new Set()};
-  c.score+=weight; c.count++; c.last=now; c.sources.add(source);
-  if(source.includes('顶部')) c.top++;
-  if(source.includes('右侧')) c.right++;
-  if(source.includes('条码')) c.barcode++;
-  S.candidates[num]=c;
+function voteAdd(map,n,src,weight){
+  if(!validNo(n))return;
+  map[n]??={num:n,score:0,frames:new Set(),sources:new Set()};
+  map[n].score+=weight;map[n].sources.add(src);
+  const m=String(src).match(/帧(\d+)/);if(m)map[n].frames.add(m[1]);
 }
-function cleanCaches(){
-  const now=Date.now();
-  for(const [k,v] of Object.entries(S.candidates)){ if(now-v.last>CFG.TTL) delete S.candidates[k]; }
-}
-function clearVerifyCache(reason='',keepTop=null){
-  S.candidates={};
-  if(keepTop && validNo(keepTop)) addCandidate(keepTop,'顶部OCR-保留',3);
-  addData('清理缓存',reason || '复核失败');
-}
-function compareDigit(a,b){
-  a=norm(a); b=norm(b);
-  const bs=[b,reverseDigits(b)].filter((x,i,arr)=>validNo(x)&&arr.indexOf(x)===i);
-  for(const bb of bs){
-    const steps=[];
-    let ok=true;
-    for(let i=0;i<13;i++){
-      const same=a[i]===bb[i];
-      steps.push(`${i+1}:${a[i]}${same?'=':'≠'}${bb[i]}${same?'√':'×'}`);
-      if(!same){ ok=false; break; }
-    }
-    addData('逐位核对',steps.join(' '), bb===b?'正序':'倒序');
-    if(ok) return true;
-  }
-  return false;
-}
-function decide(){
-  cleanCaches();
-  const st=strategy();
-  for(const c of Object.values(S.candidates).sort((a,b)=>b.score-a.score)){
-    const src=[...c.sources].join('+');
-    if(c.barcode && c.top) return {num:c.num,why:'条码+顶部OCR一致',src};
-    if(c.top && c.right && compareDigit(c.num,c.num)) return {num:c.num,why:'顶部+右侧同号',src};
-    if(c.top>=2 && st!=='strict') return {num:c.num,why:'顶部OCR连续稳定',src};
-    if(c.barcode>=2 && st!=='strict') return {num:c.num,why:'条码连续稳定',src};
-    if(st==='fast' && c.top>=1 && c.score>=3) return {num:c.num,why:'极速顶部OCR',src};
+function decide(votes){
+  const mode=strictMode();
+  const arr=Object.values(votes).sort((a,b)=>b.score-a.score);
+  for(const v of arr){
+    const src=[...v.sources].join('+');
+    if(src.includes('条码')&&src.includes('OCR'))return{num:v.num,why:'OCR+条码一致'};
+    if(v.frames.size>=2&&mode!=='strict')return{num:v.num,why:'前10帧OCR多帧一致'};
+    if(mode==='fast'&&v.score>=3)return{num:v.num,why:'极速OCR候选'};
   }
   return null;
 }
-
-async function scanOnce(force=false){
-  if(!S.active || S.busy || !S.stream || document.hidden) return;
-  S.busy=true; S.quick=false;
+async function collect10Frames(){
+  const frames=[];
+  for(let i=0;i<10;i++){
+    const fr=capture(quality().cap);
+    if(fr){const z=getZones(fr);frames.push({i:i+1,topNo:z.topNo,topBarcode:z.topBarcode,topCombo:z.topCombo,score:sharpness(z.topNo)})}
+    await new Promise(r=>setTimeout(r,55));
+  }
+  frames.sort((a,b)=>b.score-a.score);
+  return frames;
+}
+async function scanBatch(force=false){
+  if(!S.active||S.busy||!S.stream||document.hidden)return;
+  S.busy=true;
   try{
-    const frame=capture(qualityProfile().cap);
-    if(!frame) return;
-    const labelBox=findLabel(frame);
-    const label=crop(frame,labelBox);
-    const z=zonesFromLabel(label);
+    if(!(await ensureOCR())){setStage('识别异常','OCR加载失败');return}
     S.loop++;
+    setStage(S.recording?'录制中补扫':'10帧识别','正在抓取前10帧');
+    const frames=await collect10Frames();
+    const votes={};
+    set('ocrText','-');set('barText','-');
 
-    setStage(S.recording?'录制中扫描':'识别中','顶部单号主识别，条码强校验，右侧只辅助');
-    let any=false;
-
-    // 1. 顶部OCR是主力，最快进入候选
-    const topNums=await ocrCanvas(z.topNo,0,'顶部OCR');
-    for(const n of topNums){ addCandidate(n,'顶部OCR',3); any=true; }
-    setText('ocr', topNums.join('/') || '-');
-
-    // 2. 有顶部候选后立刻扫条码强校验；无候选也低频扫条码
-    const shouldBarcode = force || topNums.length || S.loop%2===0 || S.recording && S.loop%5===0;
-    if(shouldBarcode){
-      const bNums=[
-        ...(await scanBarcode(z.topBarcode,'顶部条码')),
-        ...(await scanBarcode(z.rightBarcode,'右侧条码')),
-        ...(await scanBarcode(z.comboTop,'顶部组合'))
-      ];
-      for(const n of bNums){ addCandidate(n,'条码',5); any=true; }
-      setText('barcode', bNums.join('/') || '-');
+    // 条码先扫最清晰帧，不阻塞太久
+    for(const f of frames.slice(0,3)){
+      const bs=[...(await scanBarcode(f.topBarcode,'顶部条码')), ...(await scanBarcode(f.topCombo,'顶部组合'))];
+      bs.forEach(n=>voteAdd(votes,n,'条码 帧'+f.i,5));
+      if(bs.length){set('barText',bs.join('/'));break}
     }
 
-    // 3. 右侧竖排只做辅助，不单独决定；尝试旋转/倒序
-    if(topNums.length && !S.recording){
-      const r1=await ocrCanvas(z.rightNo,90,'右侧OCR');
-      const r2=r1.length?[]:await ocrCanvas(z.rightNo,-90,'右侧OCR');
-      const rightNums=[...new Set([...r1,...r2,...r1.map(reverseDigits),...r2.map(reverseDigits)].filter(validNo))];
-      for(const n of rightNums){ addCandidate(n,'右侧OCR',1); any=true; }
-      if(topNums.length && rightNums.length){
-        const ok=topNums.some(t=>rightNums.some(r=>compareDigit(t,r)));
-        if(!ok){
-          clearVerifyCache('顶部与右侧逐位不一致，清理右侧干扰，保留顶部候选',topNums[0]);
-          S.quick=true;
-        }
+    // OCR前10帧，命中稳定就提前停止
+    for(const f of frames){
+      const ns=await ocrTop(f.topNo,f.i);
+      ns.forEach(n=>voteAdd(votes,n,'OCR 帧'+f.i,2));
+      if(ns.length)set('ocrText',ns.join('/'));
+      const hit=decide(votes);
+      if(hit){
+        set('curNo',hit.num);setStage('识别成功',hit.why);addData('锁定',hit.num,hit.why);flash();speak('success');
+        await handleWaybill(hit.num);
+        return;
       }
     }
 
-    const hit=decide();
-    if(hit){
-      setText('detected',hit.num);
-      setStage('识别成功',hit.why);
-      addData('锁定',hit.num,hit.why);
-      pulse(); beep('ok'); say('识别成功');
-      await handleWaybill(hit.num);
-      S.quick=false;
-    }else{
-      if(any){ S.quick=true; setStage('候选复核中','已识别候选，快速复核中'); }
-      else setStage(S.recording?'录制中':'识别中','未读到有效13位单号，继续扫描');
-    }
-  }catch(e){ addData('扫描异常',e.message); }
-  finally{ S.busy=false; }
+    const list=Object.values(votes).map(v=>v.num+':'+v.score).join(' / ');
+    if(list){addData('未通过候选',list);setStage('复核失败','已清理本轮候选，马上重新识别')}
+    else setStage('未识别到','请让顶部条码下方13位单号更清晰');
+  }finally{
+    S.busy=false;
+  }
 }
-function schedule(delay){
-  if(S.scanTimer) clearTimeout(S.scanTimer);
-  if(!S.active) return;
-  S.scanTimer=setTimeout(async()=>{
-    await scanOnce(false);
-    schedule(S.quick?CFG.quickDelay:(S.recording?CFG.scanRec:CFG.scanIdle));
-  },delay);
+function schedule(delay=260){
+  clearTimeout(S.timer);
+  if(!S.active)return;
+  S.timer=setTimeout(async()=>{await scanBatch(false);schedule(S.recording?1300:260)},delay);
 }
 
 function openDB(){
   return new Promise((res,rej)=>{
-    const r=indexedDB.open('packcam_clean_v1',1);
-    r.onupgradeneeded=e=>{
-      const db=e.target.result;
-      if(!db.objectStoreNames.contains('records')){
-        const s=db.createObjectStore('records',{keyPath:'id'});
-        s.createIndex('waybill','waybill',{unique:false});
-        s.createIndex('createdAt','createdAt',{unique:false});
-      }
-    };
-    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+    const r=indexedDB.open('packcam_clean_v2',1);
+    r.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('records')){const s=db.createObjectStore('records',{keyPath:'id'});s.createIndex('waybill','waybill',{unique:false});s.createIndex('createdAt','createdAt',{unique:false})}};
+    r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
   });
 }
-async function saveRecord(no,blob,startAt,endAt,reason){
+async function saveRecord(no,blob,st,ed,reason){
   const db=await openDB();
   return new Promise((res,rej)=>{
-    const tx=db.transaction('records','readwrite'), store=tx.objectStore('records'), idx=store.index('waybill');
-    const rec={id:Date.now()+'_'+no,waybill:no,blob,startAt,endAt,reason,createdAt:new Date().toISOString(),durationMs:endAt-startAt};
-    let deleted=0;
+    const tx=db.transaction('records','readwrite'),store=tx.objectStore('records'),idx=store.index('waybill');
+    const rec={id:Date.now()+'_'+no,waybill:no,blob,startAt:st,endAt:ed,durationMs:ed-st,createdAt:new Date().toISOString(),reason};
     const req=idx.openCursor(IDBKeyRange.only(no));
-    req.onsuccess=e=>{
-      const c=e.target.result;
-      if(c){ store.delete(c.primaryKey); deleted++; c.continue(); }
-      else store.put(rec);
-    };
+    req.onsuccess=e=>{const c=e.target.result;if(c){store.delete(c.primaryKey);c.continue()}else store.put(rec)};
     req.onerror=()=>store.put(rec);
-    tx.oncomplete=()=>{ S.saved++; addData('保存',no,deleted?'替换旧视频':'新视频'); beep('done'); say('本单录制完成'); res(); };
+    tx.oncomplete=()=>{addData('保存',no,'只保留最新');speak('complete');res()};
     tx.onerror=()=>rej(tx.error);
   });
 }
 async function query(no){
-  no=norm(no); if(!validNo(no)) return [];
+  no=norm(no);if(!validNo(no))return[];
   const db=await openDB();
   return new Promise((res,rej)=>{
-    const out=[], idx=db.transaction('records').objectStore('records').index('waybill');
-    idx.openCursor(IDBKeyRange.only(no)).onsuccess=e=>{
-      const c=e.target.result; if(c){out.push(c.value); c.continue();} else res(out.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,1));
-    };
+    const out=[],idx=db.transaction('records').objectStore('records').index('waybill');
+    idx.openCursor(IDBKeyRange.only(no)).onsuccess=e=>{const c=e.target.result;if(c){out.push(c.value);c.continue()}else res(out.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,1))};
     idx.onerror=()=>rej(idx.error);
   });
 }
-function revokeUrls(){ S.objectUrls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(e){}}); S.objectUrls=[]; }
+function revoke(){S.urls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(e){}});S.urls=[]}
 async function renderResults(){
-  revokeUrls();
-  const arr=await query($('searchNo').value);
-  const box=$('results'); box.innerHTML='';
-  if(!arr.length){ box.innerHTML='<div class="mini">没查到这个单号。</div>'; return; }
-  for(const r of arr){
-    const url=URL.createObjectURL(r.blob); S.objectUrls.push(url);
-    const div=document.createElement('div'); div.className='record';
-    div.innerHTML=`<b>${r.waybill}</b><div class="mini">${new Date(r.createdAt).toLocaleString('zh-CN',{hour12:false})}｜${Math.round(r.durationMs/1000)}秒｜${r.reason||''}</div><video src="${url}" controls playsinline preload="metadata"></video><p><a href="${url}" download="${r.waybill}.webm" style="color:#93c5fd">下载举证视频</a></p>`;
-    box.appendChild(div);
-  }
+  revoke();const arr=await query($('searchNo').value),box=$('records');box.innerHTML='';
+  if(!arr.length){box.innerHTML='<div class="small">没查到这个单号。</div>';return}
+  arr.forEach(r=>{const url=URL.createObjectURL(r.blob);S.urls.push(url);const div=document.createElement('div');div.className='record';div.innerHTML=`<b>${r.waybill}</b><div class="small">${new Date(r.createdAt).toLocaleString('zh-CN',{hour12:false})}｜${Math.round(r.durationMs/1000)}秒｜${r.reason||''}</div><video src="${url}" controls playsinline preload="metadata"></video><p><a href="${url}" download="${r.waybill}.webm" style="color:#93c5fd">下载举证视频</a></p>`;box.appendChild(div)});
 }
 async function handleWaybill(no){
-  no=norm(no); if(!validNo(no)) return;
-  if(!S.recording){ startRecording(no); return; }
-  if(S.recNo===no) return;
-  await finishRecording('检测到新单号，自动保存上一单');
-  startRecording(no);
+  no=norm(no);if(!validNo(no))return;
+  if(!S.recording){startRec(no);return}
+  if(S.recNo===no)return;
+  await finishRec('检测到新单号，自动保存上一单');startRec(no);
 }
-function startRecording(no){
-  if(!S.stream) return;
-  S.chunks=[]; S.recStart=Date.now(); S.recNo=no;
+function startRec(no){
+  if(!S.stream)return;
+  S.chunks=[];S.recNo=no;S.recStart=Date.now();
   const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp8')?'video/webm;codecs=vp8':'video/webm';
-  S.recorder=new MediaRecorder(S.stream,{mimeType:mime,videoBitsPerSecond:qualityProfile().bitrate});
-  S.recorder.ondataavailable=e=>{ if(e.data&&e.data.size) S.chunks.push(e.data); };
-  S.recorder.onerror=e=>addData('录制异常',(e.error&&e.error.message)||'unknown');
-  S.recorder.onstart=()=>{
-    S.recording=true; $('btnFinish').disabled=false; $('recPill').textContent='录制中 '+no; $('recPill').classList.add('recording');
-    setText('detected',no); setStage('开始录制',no); beep('ok'); say('开始录制');
-  };
+  S.recorder=new MediaRecorder(S.stream,{mimeType:mime,videoBitsPerSecond:quality().bitrate});
+  S.recorder.ondataavailable=e=>{if(e.data&&e.data.size)S.chunks.push(e.data)};
+  S.recorder.onstart=()=>{S.recording=true;$('btnFinish').disabled=false;$('recPill').textContent='录制中 '+no;$('recPill').classList.add('recording');set('curNo',no);setStage('开始录制',no);speak('start')};
   S.recorder.start(5000);
-  setTimeout(()=>{ if(S.recording && S.recNo===no) finishRecording('超过8分钟自动分段保存').then(()=>{ if(S.active) startRecording(no); }); }, 8*60*1000);
+  setTimeout(()=>{if(S.recording&&S.recNo===no)finishRec('超过8分钟自动分段保存').then(()=>{if(S.active)startRec(no)})},8*60*1000);
 }
-async function finishRecording(reason='手动完成'){
-  if(!S.recording || !S.recorder) return;
-  return new Promise(resolve=>{
-    const no=S.recNo, st=S.recStart, ed=Date.now();
-    S.recorder.onstop=async()=>{
-      const blob=new Blob(S.chunks,{type:S.recorder.mimeType||'video/webm'});
-      S.recording=false; S.recNo=null; S.chunks=[]; $('btnFinish').disabled=true; $('recPill').textContent='未录制'; $('recPill').classList.remove('recording');
-      if(blob.size>1024) await saveRecord(no,blob,st,ed,reason);
-      resolve();
-    };
-    try{ S.recorder.stop(); }catch(e){ resolve(); }
+async function finishRec(reason='手动完成'){
+  if(!S.recording||!S.recorder)return;
+  return new Promise(res=>{
+    const no=S.recNo,st=S.recStart,ed=Date.now();
+    S.recorder.onstop=async()=>{const blob=new Blob(S.chunks,{type:S.recorder.mimeType||'video/webm'});S.recording=false;S.recNo=null;S.chunks=[];$('btnFinish').disabled=true;$('recPill').textContent='未录制';$('recPill').classList.remove('recording');if(blob.size>1024)await saveRecord(no,blob,st,ed,reason);res()};
+    try{S.recorder.stop()}catch(e){res()}
   });
 }
-
 async function startWork(){
-  if(S.active) return;
-  S.active=true; S.loop=0; S.candidates={}; S.barcodeHits={}; S.data=[]; setText('dataLine','-');
-  $('btnStart').disabled=true; $('btnStop').disabled=false;
-  await startCamera(); await keepAwake(); ensureOCR();
-  setStage('工作中','APK模式：顶部OCR主识别，条码强校验');
-  addData('系统','V1 APK模式启动',qualityProfile().label);
-  schedule(80);
+  if(S.active)return;
+  await unlockAudio();
+  S.active=true;S.data=[];$('btnStart').disabled=true;$('btnStop').disabled=false;
+  await startCamera();try{if('wakeLock'in navigator)S.wake=await navigator.wakeLock.request('screen')}catch(e){}
+  ensureOCR();setStage('工作中','十帧图片文字识别已启动');schedule(80);
 }
 async function stopWork(){
-  S.active=false; if(S.scanTimer) clearTimeout(S.scanTimer); S.scanTimer=null;
-  if(S.recording) await finishRecording('停止工作自动保存');
-  stopCamera(); releaseAwake();
-  $('btnStart').disabled=false; $('btnStop').disabled=true; $('btnFinish').disabled=true;
-  setStage('已停止','');
+  S.active=false;clearTimeout(S.timer);if(S.recording)await finishRec('停止工作自动保存');stopCamera();try{S.wake&&S.wake.release()}catch(e){}S.wake=null;$('btnStart').disabled=false;$('btnStop').disabled=true;$('btnFinish').disabled=true;setStage('已停止','')
 }
-function saveCfg(){
-  localStorage.setItem('packcam_v1_quality',$('quality').value);
-  localStorage.setItem('packcam_v1_strategy',$('strategy').value);
-  addData('设置','已保存，重启工作后生效');
-}
-function loadCfg(){
-  $('quality').value=localStorage.getItem('packcam_v1_quality')||'smart';
-  $('strategy').value=localStorage.getItem('packcam_v1_strategy')||'balanced';
-}
+function saveCfg(){localStorage.setItem('pc_v2_quality',$('quality').value);localStorage.setItem('pc_v2_strict',$('strict').value);addData('设置','已保存，重新开始工作后生效')}
+function loadCfg(){$('quality').value=localStorage.getItem('pc_v2_quality')||'smart';$('strict').value=localStorage.getItem('pc_v2_strict')||'balanced'}
 
 $('btnStart').onclick=startWork;
 $('btnStop').onclick=stopWork;
-$('btnFinish').onclick=()=>finishRecording('手动完成');
-$('btnRescan').onclick=()=>scanOnce(true);
-$('btnPanel').onclick=()=>$('panel').classList.add('show');
-$('btnClosePanel').onclick=()=>$('panel').classList.remove('show');
-$('btnSaveCfg').onclick=saveCfg;
+$('btnFinish').onclick=()=>finishRec('手动完成');
+$('btnRescan').onclick=()=>scanBatch(true);
+$('btnPanel').onclick=()=>$('sheet').classList.add('show');
+$('btnClose').onclick=()=>$('sheet').classList.remove('show');
 $('btnSearch').onclick=renderResults;
-$('btnManual').onclick=()=>{ const n=norm($('manualNo').value); if(validNo(n)){ addData('手动单号',n); handleWaybill(n); $('panel').classList.remove('show'); } else alert('请输入13位快递单号'); };
-
-document.addEventListener('visibilitychange',()=>{ if(document.hidden && S.scanTimer) clearTimeout(S.scanTimer); else if(S.active) schedule(120); });
-window.addEventListener('beforeunload',e=>{ if(S.recording){ e.preventDefault(); e.returnValue='正在录制，离开会影响保存'; } });
-
-loadCfg();
-setStage('待机','点击开始工作');
-addData('系统','PackCam Clean V1 已加载');
+$('btnSaveCfg').onclick=saveCfg;
+$('btnManual').onclick=()=>{const n=norm($('manualNo').value);if(validNo(n)){addData('手动单号',n);handleWaybill(n);$('sheet').classList.remove('show')}else alert('请输入13位快递单号')};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeout(S.timer);else if(S.active)schedule(120)});
+window.addEventListener('beforeunload',e=>{if(S.recording){e.preventDefault();e.returnValue='正在录制，离开会影响保存'}});
+loadCfg();setStage('待机','点击开始工作');addData('系统','PackCam Clean V2 已加载');
 </script>
 </body>
 </html>
